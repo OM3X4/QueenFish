@@ -280,31 +280,33 @@ pub mod chess {
             };
         }
 
-        pub fn generate_knight_moves(&self , moves: &mut Vec<Move>) {
+        pub fn generate_knight_moves(&self, moves: &mut Vec<Move>) {
             // let mut moves = Vec::new();
-            let knight_squares = match self.turn {
-                Turn::WHITE => extract_bits(&self.bitboards.white_knights),
-                Turn::BLACK => extract_bits(&self.bitboards.black_knights),
-            };
-
-            // let (enemy_pieces_bb, allay_pieces_bb) =
-            //     (self.get_enemy_pieces(), self.get_allay_pieces());
-
             let enemy_bits = self.get_enemy_pieces().0;
             let allay_bits = self.get_allay_pieces().0;
 
-            for from in knight_squares {
-                let attacks = KNIGHTS_ATTACK_TABLE.get(from as usize).unwrap() & !allay_bits;
-                for to in extract_bits(&BitBoard(attacks)) {
+            let mut knights = match self.turn {
+                Turn::WHITE => self.bitboards.white_knights.0,
+                Turn::BLACK => self.bitboards.black_knights.0,
+            };
+
+            while knights != 0 {
+                let from = knights.trailing_zeros() as u64;
+                knights &= knights - 1;
+                let mut attacks = KNIGHTS_ATTACK_TABLE.get(from as usize).unwrap() & !allay_bits;
+
+                while attacks != 0 {
+                    let to = attacks.trailing_zeros() as u64;
+                    attacks &= attacks - 1;
                     let capture = (enemy_bits & to) != 0;
                     moves.push(Move::new(from.into(), to.into(), capture));
                 }
             }
         }
 
-        pub fn generate_white_pawns_moves(&self , moves: &mut Vec<Move>) {
+        pub fn generate_white_pawns_moves(&self, moves: &mut Vec<Move>) {
             let blockers = self.get_all_white_bits().0 | self.get_all_black_bits().0;
-            let pawn_squares = &self.bitboards.white_pawns;
+            // let pawn_squares = &self.bitboards.white_pawns;
 
             let enemy_pieces_bb = self.get_all_black_bits();
 
@@ -312,15 +314,18 @@ pub mod chess {
                 moves.push(Move::new(from.into(), to.into(), capture));
             };
 
-            for from in extract_bits(&pawn_squares) {
+            let mut pawns = self.bitboards.white_pawns.0;
+
+            while pawns != 0 {
+                let from = pawns.trailing_zeros() as u64;
+                pawns &= pawns - 1;
+
                 let pawn_bb = 1u64 << from;
 
                 // single and double jump
                 if from < 55 && (blockers & 1u64 << from + 8) == 0 {
                     add(from.into(), (from + 8).into(), false);
-                    if ((from as u64 & RANK_2) != 0)
-                        && (blockers & 1u64 << (from + 16)) == 0
-                    {
+                    if ((from as u64 & RANK_2) != 0) && (blockers & 1u64 << (from + 16)) == 0 {
                         add(from.into(), (from + 16).into(), false);
                     }
                 }
@@ -342,7 +347,7 @@ pub mod chess {
             }
         }
 
-        pub fn generate_black_pawns_moves(&self , moves: &mut Vec<Move>) {
+        pub fn generate_black_pawns_moves(&self, moves: &mut Vec<Move>) {
             let blockers = self.get_all_white_bits().0 | self.get_all_black_bits().0;
             let pawn_squares = &self.bitboards.black_pawns;
 
@@ -352,15 +357,18 @@ pub mod chess {
                 moves.push(Move::new(from.into(), to.into(), capture));
             };
 
-            for from in extract_bits(&pawn_squares) {
+            let mut pawns = self.bitboards.black_pawns.0;
+
+            while pawns != 0 {
+                let from = pawns.trailing_zeros() as u64;
+                pawns &= pawns - 1;
+
                 let pawn_bb = 1u64 << from;
 
                 // single and double jump
                 if from >= 8 && (blockers & 1u64 << (from - 8)) == 0 {
                     add(from.into(), (from - 8).into(), false);
-                    if ((from as u64 & RANK_7) != 0)
-                        && (blockers & 1u64 << (from - 16)) == 0
-                    {
+                    if ((from as u64 & RANK_7) != 0) && (blockers & 1u64 << (from - 16)) == 0 {
                         add(from.into(), (from - 16).into(), false);
                     }
                 }
@@ -382,7 +390,7 @@ pub mod chess {
             }
         }
 
-        pub fn generate_rook_moves(&self , moves: &mut Vec<Move>) {
+        pub fn generate_rook_moves(&self, moves: &mut Vec<Move>) {
             let allay_bits = &self.get_allay_pieces();
             let enemy_bits = &self.get_enemy_pieces();
             let all_bits = &self.get_all_bits().0;
@@ -391,12 +399,15 @@ pub mod chess {
                 moves.push(Move::new(from.into(), to.into(), capture));
             };
 
-            let rooks = match self.turn {
-                Turn::WHITE => &self.bitboards.white_rooks,
-                Turn::BLACK => &self.bitboards.black_rooks,
+            let mut rooks = match self.turn {
+                Turn::WHITE => self.bitboards.white_rooks.0,
+                Turn::BLACK => self.bitboards.black_rooks.0,
             };
 
-            for from in extract_bits(rooks) {
+            while rooks != 0 {
+                let from = rooks.trailing_zeros() as u64;
+                rooks &= rooks - 1;
+
                 // North
                 if from < 56 {
                     for to in ((from + 8)..=63).step_by(8) {
@@ -409,7 +420,7 @@ pub mod chess {
                             break;
                         };
                     }
-                }
+                };
                 // South
                 if from > 7 {
                     for to in (0..=(from - 8)).rev().step_by(8) {
@@ -422,7 +433,7 @@ pub mod chess {
                             break;
                         };
                     }
-                }
+                };
 
                 // East
                 if from % 8 != 7 {
@@ -438,8 +449,7 @@ pub mod chess {
                         };
                         to += 1;
                     }
-                }
-
+                };
                 // West
                 if from % 8 != 0 {
                     let mut to = from - 1;
@@ -456,11 +466,11 @@ pub mod chess {
                             to -= 1;
                         }
                     }
-                }
+                };
             }
         }
 
-        pub fn generate_bishop_moves(&self , moves: &mut Vec<Move>) {
+        pub fn generate_bishop_moves(&self, moves: &mut Vec<Move>) {
             let allay_bits = &self.get_allay_pieces();
             let enemy_bits = &self.get_enemy_pieces();
             let all_bits = &self.get_all_bits().0;
@@ -469,11 +479,15 @@ pub mod chess {
                 moves.push(Move::new(from.into(), to.into(), capture));
             };
 
-            let bishops = match self.turn {
-                Turn::WHITE => &self.bitboards.white_bishops,
-                Turn::BLACK => &self.bitboards.black_bishops,
+            let mut bishops = match self.turn {
+                Turn::WHITE => self.bitboards.white_bishops.0,
+                Turn::BLACK => self.bitboards.black_bishops.0,
             };
-            for from in extract_bits(bishops) {
+
+            while bishops != 0 {
+                let from = bishops.trailing_zeros() as u64;
+                bishops &= bishops - 1;
+
                 // North East
                 let mut to = from + 9;
                 while to <= 63 && to % 8 != 0 {
@@ -535,24 +549,26 @@ pub mod chess {
                     }
                 }
             }
-
         }
 
-        pub fn generate_queen_moves(&self , moves: &mut Vec<Move>) {
+        pub fn generate_queen_moves(&self, moves: &mut Vec<Move>) {
             let allay_bits = &self.get_allay_pieces();
             let enemy_bits = &self.get_enemy_pieces();
             let occupied = self.get_all_bits().0;
 
-            let queen_bits = match self.turn {
-                Turn::WHITE => &self.bitboards.white_queens,
-                Turn::BLACK => &self.bitboards.black_queens,
+            let mut queen_bits = match self.turn {
+                Turn::WHITE => self.bitboards.white_queens.0,
+                Turn::BLACK => self.bitboards.black_queens.0,
             };
 
             let mut add = |from: u64, to: u64, capture: bool| {
                 moves.push(Move::new(from.into(), to.into(), capture));
             };
 
-            for from in extract_bits(queen_bits) {
+            while queen_bits != 0 {
+                let from = queen_bits.trailing_zeros() as u64;
+                queen_bits &= queen_bits - 1;
+
                 // BISHOPS
                 // North East
                 let mut to = from + 9;
@@ -598,7 +614,7 @@ pub mod chess {
                             break;
                         }
                     }
-                }
+                };
                 // South West
                 if from >= 9 {
                     let mut to = from - 9;
@@ -632,7 +648,7 @@ pub mod chess {
                             break;
                         };
                     }
-                }
+                };
                 // South
                 if from > 7 {
                     for to in (0..=(from - 8)).rev().step_by(8) {
@@ -645,7 +661,7 @@ pub mod chess {
                             break;
                         };
                     }
-                }
+                };
 
                 // East
                 if from % 8 != 7 {
@@ -661,7 +677,7 @@ pub mod chess {
                         };
                         to += 1;
                     }
-                }
+                };
 
                 // West
                 if from % 8 != 0 {
@@ -680,13 +696,11 @@ pub mod chess {
                         }
                         to -= 1;
                     }
-                }
-            }
-
+                };
+            };
         }
 
-        pub fn generate_king_moves(&self , moves: &mut Vec<Move>) {
-
+        pub fn generate_king_moves(&self, moves: &mut Vec<Move>) {
             let offsets: [i32; 8] = [8, -8, 1, -1, 9, 7, -7, -9];
 
             let allay_bits = &self.get_allay_pieces();
@@ -702,22 +716,25 @@ pub mod chess {
                 moves.push(Move::new(from.into(), to.into(), capture));
             };
 
-            let from = extract_bits(&king_bits)[0];
+            let from = king_bits.0.trailing_zeros() as u64;
             for offset in offsets {
                 let to = (from as i32) + offset;
-                if to < 0 || to > 63 { continue; };
+                if to < 0 || to > 63 {
+                    continue;
+                };
                 let from_file = from % 8;
                 let to_file = to / 8;
-                if (((from as i32) - to) as i64).abs() > 1 { continue; };
+                if (((from as i32) - to) as i64).abs() > 1 {
+                    continue;
+                };
 
                 let to_mask = 1u64 << (to as u64);
 
                 if allay_bits.0 & to_mask != 0 {
                     continue;
                 }
-                add(from , to as u64 , (enemy_bits.0 & to_mask) != 0);
+                add(from, to as u64, (enemy_bits.0 & to_mask) != 0);
             }
-
         }
 
         pub fn generate_moves(&self) -> Vec<Move> {
@@ -735,7 +752,6 @@ pub mod chess {
             };
             moves
         }
-
     }
 
     #[inline]
@@ -773,7 +789,11 @@ mod test {
         }
         let end = std::time::Instant::now();
         let duration = end.duration_since(start);
-        println!("Time took: {:?} seconds for {} moves", duration.as_secs_f64(), count);
+        println!(
+            "Time took: {:?} seconds for {} moves",
+            duration.as_secs_f64(),
+            count
+        );
 
         // println!("white queen Moves {:#?}", board.generate_moves());
 
