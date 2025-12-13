@@ -68,8 +68,8 @@ pub mod chess {
         0x0088500000000000,
         0x0010a00000000000,
         0x0020400000000000,
-    ];
-    pub const KING_ATTACK_TABLE: [u64; 64] = [
+    ]; //
+    const KING_ATTACK_TABLE: [u64; 64] = [
         0x0000000000000302,
         0x0000000000000705,
         0x0000000000000e0a,
@@ -134,6 +134,138 @@ pub mod chess {
         0x5070000000000000,
         0xa0e0000000000000,
         0x40c0000000000000,
+    ];
+    const BLACK_PAWN_ATTACKS: [u64; 64] = [
+        0x0000000000000200,
+        0x0000000000000500,
+        0x0000000000000a00,
+        0x0000000000001400,
+        0x0000000000002800,
+        0x0000000000005000,
+        0x000000000000a000,
+        0x0000000000004000,
+        0x0000000000020000,
+        0x0000000000050000,
+        0x00000000000a0000,
+        0x0000000000140000,
+        0x0000000000280000,
+        0x0000000000500000,
+        0x0000000000a00000,
+        0x0000000000400000,
+        0x0000000002000000,
+        0x0000000005000000,
+        0x000000000a000000,
+        0x0000000014000000,
+        0x0000000028000000,
+        0x0000000050000000,
+        0x00000000a0000000,
+        0x0000000040000000,
+        0x0000000200000000,
+        0x0000000500000000,
+        0x0000000a00000000,
+        0x0000001400000000,
+        0x0000002800000000,
+        0x0000005000000000,
+        0x000000a000000000,
+        0x0000004000000000,
+        0x0000020000000000,
+        0x0000050000000000,
+        0x00000a0000000000,
+        0x0000140000000000,
+        0x0000280000000000,
+        0x0000500000000000,
+        0x0000a00000000000,
+        0x0000400000000000,
+        0x0002000000000000,
+        0x0005000000000000,
+        0x000a000000000000,
+        0x0014000000000000,
+        0x0028000000000000,
+        0x0050000000000000,
+        0x00a0000000000000,
+        0x0040000000000000,
+        0x0200000000000000,
+        0x0500000000000000,
+        0x0a00000000000000,
+        0x1400000000000000,
+        0x2800000000000000,
+        0x5000000000000000,
+        0xa000000000000000,
+        0x4000000000000000,
+        0x0000000000000000,
+        0x0000000000000000,
+        0x0000000000000000,
+        0x0000000000000000,
+        0x0000000000000000,
+        0x0000000000000000,
+        0x0000000000000000,
+        0x0000000000000000,
+    ];
+    const WHITE_PAWN_ATTACKS: [u64; 64] = [
+        0x0000000000000000,
+        0x0000000000000000,
+        0x0000000000000000,
+        0x0000000000000000,
+        0x0000000000000000,
+        0x0000000000000000,
+        0x0000000000000000,
+        0x0000000000000000,
+        0x0000000000000200,
+        0x0000000000000500,
+        0x0000000000000a00,
+        0x0000000000001400,
+        0x0000000000002800,
+        0x0000000000005000,
+        0x000000000000a000,
+        0x0000000000004000,
+        0x0000000000020000,
+        0x0000000000050000,
+        0x00000000000a0000,
+        0x0000000000140000,
+        0x0000000000280000,
+        0x0000000000500000,
+        0x0000000000a00000,
+        0x0000000000400000,
+        0x0000000002000000,
+        0x0000000005000000,
+        0x000000000a000000,
+        0x0000000014000000,
+        0x0000000028000000,
+        0x0000000050000000,
+        0x00000000a0000000,
+        0x0000000040000000,
+        0x0000000200000000,
+        0x0000000500000000,
+        0x0000000a00000000,
+        0x0000001400000000,
+        0x0000002800000000,
+        0x0000005000000000,
+        0x000000a000000000,
+        0x0000004000000000,
+        0x0000020000000000,
+        0x0000050000000000,
+        0x00000a0000000000,
+        0x0000140000000000,
+        0x0000280000000000,
+        0x0000500000000000,
+        0x0000a00000000000,
+        0x0000400000000000,
+        0x0002000000000000,
+        0x0005000000000000,
+        0x000a000000000000,
+        0x0014000000000000,
+        0x0028000000000000,
+        0x0050000000000000,
+        0x00a0000000000000,
+        0x0040000000000000,
+        0x0200000000000000,
+        0x0500000000000000,
+        0x0a00000000000000,
+        0x1400000000000000,
+        0x2800000000000000,
+        0x5000000000000000,
+        0xa000000000000000,
+        0x4000000000000000,
     ];
 
     const RANK_4: u64 = 0x00000000FF000000;
@@ -799,7 +931,6 @@ pub mod chess {
                 }
             }
         } //
-
         pub fn generate_bishop_moves_by_square(&self, from: u64) -> u64 {
             let mut attacks = 0u64;
             let occupied = self.occupied.0;
@@ -999,43 +1130,6 @@ pub mod chess {
             }
         } //
 
-        // pub fn generate_king_moves(&self, moves: &mut Vec<Move>) {
-        //     let offsets: [i32; 8] = [8, -8, 1, -1, 9, 7, -7, -9];
-
-        //     let allay_bits = &self.get_allay_pieces();
-        //     let enemy_bits = &self.get_enemy_pieces();
-        //     let occupied = self.occupied.0;
-
-        //     let (king_bits, piece_type) = match self.turn {
-        //         Turn::WHITE => (&self.bitboards.white_king, PieceType::WhiteKing),
-        //         Turn::BLACK => (&self.bitboards.black_king, PieceType::BlackKing),
-        //     };
-
-        //     let mut add = |from: u64, to: u64, capture: bool| {
-        //         moves.push(Move::new(from.into(), to.into(), capture, piece_type, None));
-        //     };
-
-        //     let from = king_bits.0.trailing_zeros() as u64;
-        //     for offset in offsets {
-        //         let to = (from as i32) + offset;
-        //         if to < 0 || to > 63 {
-        //             continue;
-        //         };
-        //         let from_file = from % 8;
-        //         let to_file = to % 8;
-        //         if (((from as i32) - to) as i64).abs() > 1 {
-        //             continue;
-        //         };
-
-        //         let to_mask = 1u64 << (to as u64);
-
-        //         if allay_bits.0 & to_mask != 0 {
-        //             continue;
-        //         }
-        //         add(from, to as u64, (enemy_bits.0 & to_mask) != 0);
-        //     }
-        // } //
-
         pub fn generate_king_moves_by_square(&self, square: u64) -> u64 {
             let mut attacks = 0u64;
             let rank = square / 8;
@@ -1199,10 +1293,14 @@ pub mod chess {
             let is_attacked_by_knights =
                 (KNIGHTS_ATTACK_TABLE.get(king_square as usize).unwrap() & enemy_knights) != 0;
 
+            if is_attacked_by_knights {
+                return true;
+            }
+
             let is_attacked_by_king =
                 (KING_ATTACK_TABLE.get(king_square as usize).unwrap() & enemy_knights) != 0;
 
-            if is_attacked_by_knights {
+            if is_attacked_by_king {
                 return true;
             }
 
@@ -1217,13 +1315,6 @@ pub mod chess {
                 self.is_check_by_rook(king.0, *enemy_rooks | *enemy_queens);
 
             if is_attacked_by_rooks_or_queens {
-                return true;
-            }
-
-            let is_attacked_by_king =
-                (self.generate_king_moves_by_square(king_square)) & enemy_king.0 != 0;
-
-            if is_attacked_by_king {
                 return true;
             }
 
@@ -1495,7 +1586,7 @@ mod test {
 
         let start = std::time::Instant::now();
         let mut count = 0;
-        let mv = Move::new(8, 16, false, PieceType::WhitePawn, None);
+        let _mv = Move::new(8, 16, false, PieceType::WhitePawn, None);
         for _ in 0..1_000_000 {
             board.generate_moves();
             count += 1;
