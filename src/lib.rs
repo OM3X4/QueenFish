@@ -1361,6 +1361,7 @@ pub mod chess {
                 (KNIGHTS_ATTACK_TABLE.get(king_square as usize).unwrap() & enemy_knights) != 0;
 
             if is_attacked_by_knights {
+
                 return true;
             }
 
@@ -1387,31 +1388,18 @@ pub mod chess {
 
             let file = king_square % 8;
 
+
             match turn {
                 Turn::BLACK => {
-                    // White pawns attack DOWN (-7, -9)
-                    if king_square >= 7 && file != 0 {
-                        if enemy_pawns & (1u64 << (king_square - 7)) != 0 {
-                            return true;
-                        }
-                    }
-                    if king_square >= 9 && file != 7 {
-                        if enemy_pawns & (1u64 << (king_square - 9)) != 0 {
-                            return true;
-                        }
+                    let mask = BLACK_PAWN_ATTACKS[king_square as usize];
+                    if enemy_pawns & mask != 0 {
+                        return true;
                     }
                 }
                 Turn::WHITE => {
-                    // Black pawns attack UP (+7, +9)
-                    if king_square <= 56 && file != 7 {
-                        if enemy_pawns & (1u64 << (king_square + 7)) != 0 {
-                            return true;
-                        }
-                    }
-                    if king_square <= 54 && file != 0 {
-                        if enemy_pawns & (1u64 << (king_square + 9)) != 0 {
-                            return true;
-                        }
+                    let mask = WHITE_PAWN_ATTACKS[king_square as usize];
+                    if enemy_pawns & mask != 0 {
+                        return true;
                     }
                 }
             }
@@ -1420,7 +1408,6 @@ pub mod chess {
         } //
 
         pub fn make_move(&mut self, mv: Move) {
-
             let mut captured_piece_type = None;
             if self.bitboards.white_pawns.0 & (1u64 << mv.to) != 0 {
                 captured_piece_type = Some(PieceType::WhitePawn);
@@ -1688,7 +1675,8 @@ mod test {
         // board.load_from_fen("1rb3kr/p2p4/np6/2p1qppp/5PnP/PPPp4/1B2P1KR/RN3BN1 w");
         // board.load_from_fen("1nk2bnr/4p3/r2qNp2/p6p/pP1pP1pP/3R1N2/1BPP1PP1/3QK1R1 w");
         // board.load_from_fen("2kr1bnB/pppN4/6p1/1N3p2/1np2P1r/P3Q3/4P1PP/1bK2BR1 w");
-        board.load_from_fen("r4bnr/p2k4/Bpnp1p2/2p1p1pp/4PqP1/3PBP1P/PPP5/RNK2QNR w");
+        // board.load_from_fen("r4bnr/p2k4/Bpnp1p2/2p1p1pp/4PqP1/3PBP1P/PPP5/RNK2QNR w");
+        board.load_from_fen("r1b2b1r/2p1q1k1/n1n1pppp/1P1p4/pP3P1P/2NPP1P1/R1P1N1K1/2B1Q2R w");
         // println!(
         //     "is king in check: {:#?}",
         //     board.is_king_in_check(Turn::WHITE)
@@ -1701,10 +1689,10 @@ mod test {
     fn is_king_in_check() {
         let mut board = Board::new();
 
-        board.load_from_fen("r4bnr/p2k4/Bpnp1p2/2p1p1pp/4PBP1/3P1P1P/PPP5/RNK2QNR w");
+        board.load_from_fen("r1b2b1r/2p1q1k1/n1n1pppp/1P1p4/pP3P1P/2NPP1P1/R1P1N2K/2B1Q2R w");
 
-        board.load_from_fen("r4bnr/p2k4/Bpnp1p2/2p1p1pp/4PqP1/3PBP1P/PPP5/RNK2QNR w");
-        board.make_move(Move::new(20 , 29 , true , PieceType::WhiteBishop , None));
+        // board.load_from_fen("r4bnr/p2k4/Bpnp1p2/2p1p1pp/4PqP1/3PBP1P/PPP5/RNK2QNR w");
+        // board.make_move(Move::new(20 , 29 , true , PieceType::WhiteBishop , None));
 
         println!("{:#?}", board.to_fen());
 
