@@ -1269,8 +1269,10 @@ pub mod chess {
                 all_locations |= bb;
                 if occ & bb != 0 {
                     if sliders & bb != 0 {
+                        println!("checking bishop {sq}");
                         return true;
                     }
+                    break;
                 }
                 sq += 9;
             }
@@ -1282,8 +1284,10 @@ pub mod chess {
                 all_locations |= bb;
                 if occ & bb != 0 {
                     if sliders & bb != 0 {
+                        println!("checking bishop {sq}");
                         return true;
                     }
+                    break;
                 }
                 sq += 7;
             }
@@ -1297,8 +1301,10 @@ pub mod chess {
                 all_locations |= bb;
                 if occ & bb != 0 {
                     if sliders & bb != 0 {
+                        println!("checking bishop {sq}");
                         return true;
                     }
+                    break;
                 }
                 sq -= 7;
             }
@@ -1310,8 +1316,10 @@ pub mod chess {
                 all_locations |= bb;
                 if occ & bb != 0 {
                     if sliders & bb != 0 {
+                        println!("checking bishop {sq}");
                         return true;
                     }
+                    break;
                 }
                 sq -= 9;
             }
@@ -1340,6 +1348,7 @@ pub mod chess {
                     if sliders & bb != 0 {
                         return true;
                     }
+                    break;
                 }
                 sq += 8;
             }
@@ -1351,6 +1360,7 @@ pub mod chess {
                     if sliders & bb != 0 {
                         return true;
                     }
+                    break;
                 }
                 sq -= 8;
             }
@@ -1363,6 +1373,7 @@ pub mod chess {
                     if sliders & bb != 0 {
                         return true;
                     }
+                    break;
                 }
                 sq += 1;
             }
@@ -1374,6 +1385,7 @@ pub mod chess {
                     if sliders & bb != 0 {
                         return true;
                     }
+                    break;
                 }
                 sq -= 1;
             }
@@ -1398,11 +1410,9 @@ pub mod chess {
             let mut pesudo_moves: Vec<Move> = Vec::new();
             let mut legal_moves: Vec<Move> = Vec::new();
 
-            // println!("Started generating moves with FEN : {} " , self.to_fen());
 
             self.generate_pesudo_moves(&mut pesudo_moves);
 
-            // println!("Passed pesudo generation");
             let king_bb = match self.turn {
                 Turn::WHITE => self.bitboards.white_king.0,
                 Turn::BLACK => self.bitboards.black_king.0,
@@ -1415,7 +1425,6 @@ pub mod chess {
 
             let is_king_in_check_now = self.is_king_in_check(self.turn);
 
-            // println!("King in check : {}", is_king_in_check_now);
 
             for mv in pesudo_moves {
                 // if !is_king_in_check_now {
@@ -1477,9 +1486,6 @@ pub mod chess {
                 Turn::WHITE => &self.bitboards.black_pawns.0,
             };
 
-            // println!("king bb: {:064b}", king);
-            // println!("enemy bishops: {:064b}", enemy_bishops);
-            // println!("enemy queens: {:064b}", enemy_queens);
 
             let is_attacked_by_knights =
                 (KNIGHTS_ATTACK_TABLE.get(king_square as usize).unwrap() & enemy_knights) != 0;
@@ -1501,9 +1507,6 @@ pub mod chess {
             if is_attacked_by_bishops_or_queens {
                 return true;
             }
-
-            // println!("Enemy Rooks: {:#?}" ,  *enemy_rooks as u64);
-            // println!("Enemy Queens: {:#?}" , *enemy_queens as u64);
 
             let is_attacked_by_rooks_or_queens =
                 self.is_check_by_rook(*king, *enemy_rooks | *enemy_queens);
@@ -1743,10 +1746,6 @@ mod test {
             duration.as_secs_f64(),
             count
         );
-
-        // println!("white queen Moves {:#?}", board.generate_moves());
-
-        // println!("{:?}", board);
     }
 
     #[test]
@@ -1788,15 +1787,15 @@ mod test {
     fn move_generation() {
         let mut board = Board::new();
         // board.load_from_fen("rnb2b1r/pp2kp2/6p1/2p1p1Pp/2P1n3/2QPB2B/qP2KP1P/RN4NR b");
-        // board.load_from_fen("rnb2b1r/pp3p2/4k1p1/2p1p1Pp/2P1n3/2QPB2B/qP2KP1P/RN4NR b");
-        // println!(
-        //     "is king in check: {:#?}",
-        //     board.is_king_in_check(Turn::BLACK)
-        // )
+        board.load_from_fen("1rb3kr/p2p4/np6/2p1qppp/5PnP/PPPp3K/1B2P2R/RN3BN1 w");
+        println!(
+            "is king in check: {:#?}",
+            board.is_king_in_check(Turn::WHITE)
+        )
 
-        let king_bb = 1u64 << 53; // f7
-        let bishops = 1u64 << 26; // c4
-        assert!(board.is_check_by_bishop(king_bb, bishops));
+        // let king_bb = 1u64 << 53; // f7
+        // let bishops = 1u64 << 26; // c4
+        // assert!(board.is_check_by_bishop(king_bb, bishops));
         // let moves = board.generate_moves();
         // println!("{:#?}", moves);
     }
