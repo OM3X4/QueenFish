@@ -268,6 +268,84 @@ pub mod chess {
         0x4000000000000000,
     ];
 
+    /// For each square:
+    /// rank ∪ file ∪ diagonals (excluding the square itself)
+    pub const SQUARE_RAYS: [u64; 64] = [
+        /* A1 */ 0x81412111090503FE,
+        /* B1 */ 0x02824222120A07FD,
+        /* C1 */ 0x0404844424150EFB,
+        /* D1 */ 0x08080888492A1CF7,
+        /* E1 */ 0x10101011925438EF,
+        /* F1 */ 0x2020212224A870DF,
+        /* G1 */ 0x404142444850E0BF,
+        /* H1 */ 0x8182848890A0C07F,
+        /* A2 */ 0x412111090503FE01,
+        /* B2 */ 0x824222120A07FD02,
+        /* C2 */ 0x04844424150EFB04,
+        /* D2 */ 0x080888492A1CF708,
+        /* E2 */ 0x101011925438EF10,
+        /* F2 */ 0x20212224A870DF20,
+        /* G2 */ 0x4142444850E0BF40,
+        /* H2 */ 0x82848890A0C07F80,
+        /* A3 */ 0x2111090503FE0101,
+        /* B3 */ 0x4222120A07FD0202,
+        /* C3 */ 0x844424150EFB0404,
+        /* D3 */ 0x0888492A1CF70808,
+        /* E3 */ 0x1011925438EF1010,
+        /* F3 */ 0x212224A870DF2020,
+        /* G3 */ 0x42444850E0BF4040,
+        /* H3 */ 0x848890A0C07F8080,
+        /* A4 */ 0x11090503FE010101,
+        /* B4 */ 0x22120A07FD020202,
+        /* C4 */ 0x4424150EFB040404,
+        /* D4 */ 0x88492A1CF7080808,
+        /* E4 */ 0x11925438EF101010,
+        /* F4 */ 0x2224A870DF202020,
+        /* G4 */ 0x444850E0BF404040,
+        /* H4 */ 0x8890A0C07F808080,
+        /* A5 */ 0x090503FE01010101,
+        /* B5 */ 0x120A07FD02020202,
+        /* C5 */ 0x24150EFB04040404,
+        /* D5 */ 0x492A1CF708080808,
+        /* E5 */ 0x925438EF10101010,
+        /* F5 */ 0x24A870DF20202020,
+        /* G5 */ 0x4850E0BF40404040,
+        /* H5 */ 0x90A0C07F80808080,
+        /* A6 */ 0x0503FE0101010101,
+        /* B6 */ 0x0A07FD0202020202,
+        /* C6 */ 0x150EFB0404040404,
+        /* D6 */ 0x2A1CF70808080808,
+        /* E6 */ 0x5438EF1010101010,
+        /* F6 */ 0xA870DF2020202020,
+        /* G6 */ 0x50E0BF4040404040,
+        /* H6 */ 0xA0C07F8080808080,
+        /* A7 */ 0x03FE010101010101,
+        /* B7 */ 0x07FD020202020202,
+        /* C7 */ 0x0EFB040404040404,
+        /* D7 */ 0x1CF7080808080808,
+        /* E7 */ 0x38EF101010101010,
+        /* F7 */ 0x70DF202020202020,
+        /* G7 */ 0xE0BF404040404040,
+        /* H7 */ 0xC07F808080808080,
+        /* A8 */ 0xFE01010101010101,
+        /* B8 */ 0xFD02020202020202,
+        /* C8 */ 0xFB04040404040404,
+        /* D8 */ 0xF708080808080808,
+        /* E8 */ 0xEF10101010101010,
+        /* F8 */ 0xDF20202020202020,
+        /* G8 */ 0xBF40404040404040,
+        /* H8 */ 0x7F80808080808080,
+    ];
+    pub const SQUARE_RAYS_WITH_SELF: [u64; 64] = {
+        let mut arr = [0u64; 64];
+        let mut i = 0;
+        while i < 64 {
+            arr[i] = SQUARE_RAYS[i] | (1u64 << i);
+            i += 1;
+        }
+        arr
+    };
+
     const RANK_4: u64 = 0x00000000FF000000;
     const RANK_5: u64 = 0x000000FF00000000;
     const RANK_2: u64 = 0x000000000000FF00;
@@ -278,7 +356,7 @@ pub mod chess {
     const FILE_A: u64 = 0x0101010101010101;
     const FILE_H: u64 = 0x8080808080808080;
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq)]
     pub enum PieceType {
         WhitePawn,
         WhiteKnight,
@@ -328,7 +406,7 @@ pub mod chess {
     #[derive(Copy, Clone, Debug)]
     struct BitBoard(u64);
 
-    #[derive(Debug)]
+    #[derive(Debug, Copy, Clone)]
     pub enum Turn {
         WHITE,
         BLACK,
@@ -1244,8 +1322,34 @@ pub mod chess {
             self.generate_pesudo_moves(&mut pesudo_moves);
 
             // println!("Passed pesudo generation");
+            let king_bb = match self.turn {
+                Turn::WHITE => self.bitboards.white_king.0,
+                Turn::BLACK => self.bitboards.black_king.0,
+            };
+
+            let king_type = match self.turn {
+                Turn::WHITE => PieceType::WhiteKing,
+                Turn::BLACK => PieceType::BlackKing,
+            };
+
+            let is_king_in_check_now = self.is_king_in_check(self.turn);
 
             for mv in pesudo_moves {
+                if !is_king_in_check_now {
+                    if (1u64 << mv.from) & SQUARE_RAYS[king_bb.trailing_zeros() as usize] == 0
+                        && mv.piece_type != king_type
+                    {
+                        legal_moves.push(mv);
+                        continue;
+                    }
+                } else {
+                    if (1u64 << mv.to) & SQUARE_RAYS[king_bb.trailing_zeros() as usize] == 0
+                        && mv.piece_type != king_type
+                    {
+                        continue;
+                    }
+                }
+
                 let old_bitboards = self.bitboards;
                 self.make_move(mv);
                 let is_illegal = self.is_king_in_check(match self.turn {
@@ -1259,7 +1363,7 @@ pub mod chess {
                 self.switch_turn();
             }
             return legal_moves;
-        }
+        } //
 
         pub fn is_king_in_check(&self, turn: Turn) -> bool {
             let (king, enemy_king) = match turn {
