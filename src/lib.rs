@@ -812,71 +812,93 @@ pub mod chess {
         } //
 
         pub fn generate_rook_moves(&self, moves: &mut Vec<Move>) {
-            let allay_bits = &self.get_allay_pieces();
-            let enemy_bits = &self.get_enemy_pieces();
-            let all_bits = &self.occupied.0;
+            let allay = self.get_allay_pieces().0;
+            let enemy = self.get_enemy_pieces().0;
 
             let (mut rooks, piece_type) = match self.turn {
                 Turn::WHITE => (self.bitboards.white_rooks.0, PieceType::WhiteRook),
                 Turn::BLACK => (self.bitboards.black_rooks.0, PieceType::BlackRook),
             };
+
             let mut add = |from: u64, to: u64, capture: bool| {
-                moves.push(Move::new(from.into(), to.into(), capture, piece_type, None));
+                moves.push(Move::new(from, to, capture, piece_type, None));
             };
 
             while rooks != 0 {
                 let from = rooks.trailing_zeros() as u64;
                 rooks &= rooks - 1;
 
-                // North
-                if from < 56 {
-                    for to in ((from + 8)..=63).step_by(8) {
-                        let to_mask = 1u64 << (to);
-                        add(from, to, (enemy_bits.0 & to_mask) != 0);
-                        if all_bits & to_mask != 0 {
-                            break;
-                        };
+                /* ================= NORTH ================= */
+                let mut to = from + 8;
+                while to < 64 {
+                    let bb = 1u64 << to;
+                    if allay & bb != 0 {
+                        break;
                     }
-                };
-                // South
-                if from > 7 {
-                    for to in (0..=(from - 8)).rev().step_by(8) {
-                        let to_mask = 1u64 << (to);
-                        add(from, to, (enemy_bits.0 & to_mask) != 0);
-                        if all_bits & to_mask != 0 {
-                            break;
-                        };
+                    if enemy & bb != 0 {
+                        add(from, to, true);
+                        break;
                     }
-                };
+                    add(from, to, false);
+                    to += 8;
+                }
 
-                // East
-                if from % 8 != 7 {
-                    let mut to = from + 1;
-                    while to % 8 != 0 {
-                        let to_mask = 1u64 << (to);
-                        add(from, to, (enemy_bits.0 & to_mask) != 0);
-                        if all_bits & to_mask != 0 {
+                /* ================= SOUTH ================= */
+                if from >= 8 {
+                    let mut to = from - 8;
+                    loop {
+                        let bb = 1u64 << to;
+                        if allay & bb != 0 {
                             break;
-                        };
-                        to += 1;
+                        }
+                        if enemy & bb != 0 {
+                            add(from, to, true);
+                            break;
+                        }
+                        add(from, to, false);
+                        if to < 8 {
+                            break;
+                        }
+                        to -= 8;
                     }
-                };
-                // West
+                }
+
+                /* ================= EAST ================= */
+                let mut to = from + 1;
+                while to < 64 && to % 8 != 0 {
+                    let bb = 1u64 << to;
+                    if allay & bb != 0 {
+                        break;
+                    }
+                    if enemy & bb != 0 {
+                        add(from, to, true);
+                        break;
+                    }
+                    add(from, to, false);
+                    to += 1;
+                }
+
+                /* ================= WEST ================= */
                 if from % 8 != 0 {
                     let mut to = from - 1;
-                    while to % 8 != 7 {
-                        let to_mask = 1u64 << (to);
-                        add(from, to, (enemy_bits.0 & to_mask) != 0);
-                        if all_bits & to_mask != 0 {
+                    loop {
+                        let bb = 1u64 << to;
+                        if allay & bb != 0 {
                             break;
-                        };
-                        if to > 0 {
-                            to -= 1;
                         }
+                        if enemy & bb != 0 {
+                            add(from, to, true);
+                            break;
+                        }
+                        add(from, to, false);
+                        if to % 8 == 0 {
+                            break;
+                        }
+                        to -= 1;
                     }
-                };
+                }
             }
-        } //
+        }
 
         pub fn generate_rook_moves_by_square(&self, from: u64) -> u64 {
             let mut attacks = 0u64;
@@ -1250,8 +1272,8 @@ pub mod chess {
                         };
                     };
                     sq += d;
-                };
-            };
+                }
+            }
             false
         } //
 
@@ -1378,7 +1400,7 @@ pub mod chess {
                 }
                 self.bitboards = old_bitboards;
                 self.switch_turn();
-            };
+            }
             return legal_moves;
         } //
 
