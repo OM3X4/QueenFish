@@ -1011,7 +1011,7 @@ pub mod chess {
                             break;
                         }
                     }
-                }
+                };
             }
         } //
 
@@ -1035,69 +1035,145 @@ pub mod chess {
 
                 // BISHOPS
                 // North East
+                // let mut to = from + 9;
+                // while to <= 63 && to % 8 != 0 {
+                //     let to_mask = 1u64 << (to);
+                //     if allay_bits.0 & to_mask != 0 {
+                //         break;
+                //     }
+                //     add(from, to, (enemy_bits.0 & to_mask) != 0);
+                //     if occupied & to_mask != 0 {
+                //         break;
+                //     };
+                //     to += 9;
+                // }
+                // // North West
+                // let mut to = from + 7;
+                // while to <= 63 && to % 8 != 7 {
+                //     let to_mask = 1u64 << (to);
+                //     if allay_bits.0 & to_mask != 0 {
+                //         break;
+                //     }
+                //     add(from, to, (enemy_bits.0 & to_mask) != 0);
+                //     if occupied & to_mask != 0 {
+                //         break;
+                //     };
+                //     to += 7;
+                // }
+                // // South East
+                // if from >= 7 {
+                //     let mut to = from - 7;
+                //     while to % 8 != 0 {
+                //         let to_mask = 1u64 << (to);
+                //         if allay_bits.0 & to_mask != 0 {
+                //             break;
+                //         }
+                //         add(from, to, (enemy_bits.0 & to_mask) != 0);
+                //         if occupied & to_mask != 0 {
+                //             break;
+                //         };
+                //         if to > 7 {
+                //             to -= 7;
+                //         } else {
+                //             break;
+                //         }
+                //     }
+                // };
+                // // South West
+                // if from >= 9 {
+                //     let mut to = from - 9;
+                //     while to > 0 && to % 8 != 7 {
+                //         let to_mask = 1u64 << (to);
+                //         if allay_bits.0 & to_mask != 0 {
+                //             break;
+                //         }
+                //         add(from, to, (enemy_bits.0 & to_mask) != 0);
+                //         if occupied & to_mask != 0 {
+                //             break;
+                //         };
+                //         if to > 9 {
+                //             to -= 9;
+                //         } else {
+                //             break;
+                //         }
+                //     }
+                // }
+
+                // North East
                 let mut to = from + 9;
-                while to <= 63 && to % 8 != 0 {
+                while to <= 63 && ((1u64 << to) & FILE_A) == 0 {
                     let to_mask = 1u64 << (to);
-                    if allay_bits.0 & to_mask != 0 {
-                        break;
-                    }
-                    add(from, to, (enemy_bits.0 & to_mask) != 0);
                     if occupied & to_mask != 0 {
-                        break;
-                    };
-                    to += 9;
-                }
-                // North West
-                let mut to = from + 7;
-                while to <= 63 && to % 8 != 7 {
-                    let to_mask = 1u64 << (to);
-                    if allay_bits.0 & to_mask != 0 {
-                        break;
-                    }
-                    add(from, to, (enemy_bits.0 & to_mask) != 0);
-                    if occupied & to_mask != 0 {
-                        break;
-                    };
-                    to += 7;
-                }
-                // South East
-                if from >= 7 {
-                    let mut to = from - 7;
-                    while to % 8 != 0 {
-                        let to_mask = 1u64 << (to);
                         if allay_bits.0 & to_mask != 0 {
                             break;
                         }
-                        add(from, to, (enemy_bits.0 & to_mask) != 0);
-                        if occupied & to_mask != 0 {
+                        add(from, to, true);
+                        break;
+                    } else {
+                        add(from, to, false);
+                    }
+                    to += 9;
+                }
+
+                // North West
+                let mut to = from + 7;
+                while to <= 63 && ((1u64 << to) & FILE_H) == 0 {
+                    let to_mask = 1u64 << (to);
+                    if occupied & to_mask != 0 {
+                        if allay_bits.0 & to_mask != 0 {
                             break;
-                        };
-                        if to > 7 {
+                        }
+                        add(from, to, true);
+                        break;
+                    } else {
+                        add(from, to, false);
+                    }
+                    to += 7;
+                }
+
+                // South East
+                if from >= 7 {
+                    let mut to = from - 7;
+                    while ((1u64 << to) & FILE_A) == 0 {
+                        let to_mask = 1u64 << (to);
+                        if occupied & to_mask != 0 {
+                            if allay_bits.0 & to_mask != 0 {
+                                break;
+                            }
+                            add(from, to, true);
+                            break;
+                        } else {
+                            add(from, to, false);
+                        }
+                        if to >= 7 {
                             to -= 7;
                         } else {
                             break;
                         }
                     }
-                };
+                }
+
                 // South West
                 if from >= 9 {
                     let mut to = from - 9;
-                    while to > 0 && to % 8 != 7 {
+                    while ((1u64 << to) & FILE_H) == 0 {
                         let to_mask = 1u64 << (to);
-                        if allay_bits.0 & to_mask != 0 {
-                            break;
-                        }
-                        add(from, to, (enemy_bits.0 & to_mask) != 0);
                         if occupied & to_mask != 0 {
+                            if allay_bits.0 & to_mask != 0 {
+                                break;
+                            }
+                            add(from, to, true);
                             break;
-                        };
-                        if to > 9 {
+                        } else {
+                            add(from, to, false);
+                        }
+                        if to >= 9 {
                             to -= 9;
                         } else {
                             break;
                         }
                     }
-                }
+                };
 
                 // ROOKS
                 // North
