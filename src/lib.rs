@@ -777,10 +777,6 @@ pub mod chess {
                 }
                 // attacks
                 let attacks_bb = BLACK_PAWN_ATTACKS[from as usize];
-                if pawn_bb.trailing_zeros() == 53 {
-                    println!("PAWN attacks {:#?}", attacks_bb.trailing_zeros());
-                }
-
                 let mut attacks = attacks_bb & enemy_pieces_bb.0;
                 while attacks != 0 {
                     let to = attacks.trailing_zeros() as u64;
@@ -1356,17 +1352,18 @@ pub mod chess {
             };
 
             let is_king_in_check_now = self.is_king_in_check(self.turn);
+            let king_square = king_bb.trailing_zeros() as usize;
 
             for mv in pesudo_moves {
                 if !is_king_in_check_now {
-                    if ((1u64 << mv.from) & SQUARE_RAYS[king_bb.trailing_zeros() as usize]) == 0
+                    if ((1u64 << mv.from) & SQUARE_RAYS[king_square]) == 0
                         && mv.piece_type != king_type
                     {
                         legal_moves.push(mv);
                         continue;
                     }
                 } else {
-                    if (1u64 << mv.to) & SQUARE_RAYS[king_bb.trailing_zeros() as usize] == 0
+                    if (1u64 << mv.to) & (SQUARE_RAYS[king_square] | KNIGHTS_ATTACK_TABLE[king_square]) == 0
                         && mv.piece_type != king_type
                     {
                         continue;
