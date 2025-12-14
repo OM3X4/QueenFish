@@ -704,7 +704,7 @@ pub mod chess {
         } //
 
         pub fn generate_white_pawns_moves(&self, moves: &mut Vec<Move>) {
-            let blockers = self.get_all_white_bits().0 | self.get_all_black_bits().0;
+            let blockers = self.occupied.0;
             // let pawn_squares = &self.bitboards.white_pawns;
 
             let enemy_pieces_bb = self.get_all_black_bits();
@@ -735,19 +735,13 @@ pub mod chess {
                     }
                 }
 
-                // attack left
-                if from + 7 < 63
-                    && ((enemy_pieces_bb.0 & 1u64 << (from + 7)) != 0)
-                    && ((pawn_bb & FILE_A) == 0)
-                {
-                    add(from.into(), from + 7, true);
-                }
-                // attack right
-                if from + 9 < 63
-                    && (enemy_pieces_bb.0 & 1u64 << (from + 9)) != 0
-                    && ((pawn_bb & FILE_H) == 0)
-                {
-                    add(from.into(), from + 9, true);
+                // attacks
+                let attacks_bb = WHITE_PAWN_ATTACKS[from as usize];
+                let mut attacks = attacks_bb & enemy_pieces_bb.0;
+                while attacks != 0 {
+                    let to = attacks.trailing_zeros() as u64;
+                    attacks &= attacks - 1;
+                    add(from.into(), to.into(), true);
                 }
             }
         } //
@@ -781,20 +775,17 @@ pub mod chess {
                         add(from.into(), (from - 16).into(), false);
                     }
                 }
-
-                // attack left
-                if from - 7 > 0
-                    && ((enemy_pieces_bb.0 & 1u64 << (from - 7)) != 0)
-                    && ((pawn_bb & FILE_H) == 0)
-                {
-                    add(from.into(), from - 7, true);
+                // attacks
+                let attacks_bb = BLACK_PAWN_ATTACKS[from as usize];
+                if pawn_bb.trailing_zeros() == 53 {
+                    println!("PAWN attacks {:#?}", attacks_bb.trailing_zeros());
                 }
-                // attack right
-                if from - 9 > 0
-                    && (enemy_pieces_bb.0 & 1u64 << (from - 9)) != 0
-                    && ((pawn_bb & FILE_A) == 0)
-                {
-                    add(from.into(), from - 9, true);
+
+                let mut attacks = attacks_bb & enemy_pieces_bb.0;
+                while attacks != 0 {
+                    let to = attacks.trailing_zeros() as u64;
+                    attacks &= attacks - 1;
+                    add(from.into(), to.into(), true);
                 }
             }
         } //
@@ -1371,7 +1362,6 @@ pub mod chess {
                     if ((1u64 << mv.from) & SQUARE_RAYS[king_bb.trailing_zeros() as usize]) == 0
                         && mv.piece_type != king_type
                     {
-
                         legal_moves.push(mv);
                         continue;
                     }
@@ -1739,7 +1729,7 @@ mod test {
         // board.load_from_fen("1nk2bnr/4p3/r2qNp2/p6p/pP1pP1pP/3R1N2/1BPP1PP1/3QK1R1 w");
         // board.load_from_fen("2kr1bnB/pppN4/6p1/1N3p2/1np2P1r/P3Q3/4P1PP/1bK2BR1 w");
         // board.load_from_fen("r4bnr/p2k4/Bpnp1p2/2p1p1pp/4PqP1/3PBP1P/PPP5/RNK2QNR w");
-        board.load_from_fen("rnbqk2r/ppppnp1p/6p1/bB2p1Q1/4P3/1P3P2/P1PP2PP/R1B2KNR b");
+        board.load_from_fen("rBbq1k1r/p1p1bp1p/5PN1/3p3P/6p1/RnN3P1/1PPPP3/2BQKBR1 b");
         // println!(
         //     "is king in check: {:#?}",
         //     board.is_king_in_check(Turn::WHITE)
