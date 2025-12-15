@@ -1,9 +1,10 @@
 fn main() {
-    // println!("Hi Motherfuckers")
+
+    use chess::board::*;
+
     let mut fen = String::new();
     std::io::stdin().read_line(&mut fen).unwrap();
 
-    use chess::chess::Board;
     let mut board = Board::new();
 
     board.load_from_fen(fen.trim());

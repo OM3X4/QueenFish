@@ -136,7 +136,7 @@ impl Board {
             return 0;
         }
 
-        if depth >= 16 {
+        if depth >= 1 {
             return self.evaluate();
         }
 
@@ -147,6 +147,7 @@ impl Board {
             }
         }
         let moves = self.generate_moves();
+        let hashmap: HashMap<Move, Vec<String>> = HashMap::new();
         match self.turn {
             Turn::WHITE => {
                 let mut best_score = i32::MIN;

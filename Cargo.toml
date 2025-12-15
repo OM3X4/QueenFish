@@ -17,3 +17,7 @@ path = "src/bin/test_checkmate.rs"
 name = "minimax"
 path = "src/bin/minimax.rs"
 
+[[bin]]
+name = "py_api"
+path = "src/bin/py_api.rs"
+

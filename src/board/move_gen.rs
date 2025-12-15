@@ -44,7 +44,7 @@ impl Board {
             return;
         }
 
-        let mut attacks = KING_ATTACK_TABLE.get(from as usize).unwrap() & !allay_bits;
+        let mut attacks = (KING_ATTACK_TABLE.get(from as usize).unwrap()) & !allay_bits;
 
         while attacks != 0 {
             let to = attacks.trailing_zeros() as u64;
@@ -702,7 +702,7 @@ impl Board {
             Turn::BLACK => PieceType::BlackKing,
         };
 
-        let is_king_in_check_now = self.is_king_in_check(self.turn);
+        let is_king_in_check_now = self.is_king_in_check((self.turn));
         let king_square = king_bb.trailing_zeros() as usize;
 
         if king_square > 63 {
@@ -728,6 +728,7 @@ impl Board {
             let old_bitboards = self.bitboards;
             self.make_move(mv);
             self.switch_turn();
+            dbg!(mv.from , mv.to , self.to_fen() , self.is_king_in_check(self.turn));
             let is_illegal = self.is_king_in_check(self.turn);
             if !is_illegal {
                 legal_moves.push(mv);
@@ -927,4 +928,24 @@ impl Board {
         };
         self.hash ^= z.side_to_move;
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let mut board = Board::new();
+        board.load_from_fen("r2q1bn1/p1pkp1pr/2n2p2/1p1p1b1p/1P1P1B2/5PPP/P1PNP3/2RQKBNR b - - 3 10");
+        board.load_from_fen("r2q1bn1/p1p1p1pr/2nk1p2/1p1p1b1p/1P1P1B2/5PPP/P1PNP3/2RQKBNR b");
+
+        dbg!(board.is_king_in_check(Turn::WHITE));
+
+        let moves = board.generate_moves();
+        for mv in moves {
+            // println!("{:?} , {:?}", mv.from , mv.to);
+        }
+    }
+
 }
