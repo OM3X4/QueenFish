@@ -1,6 +1,7 @@
 fn main() {
 
-    use chess::chess::Board;
+    // use chess::chess::Board;
+    use chess::board::Board;
     let mut board = Board::new();
 
     let start = std::time::Instant::now();

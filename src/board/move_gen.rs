@@ -1,0 +1,986 @@
+use super::{Board , Move , PieceType , Turn};
+use super::constants::{KING_ATTACK_TABLE , KNIGHTS_ATTACK_TABLE , BLACK_PAWN_ATTACKS , WHITE_PAWN_ATTACKS , SQUARE_RAYS};
+use super::constants::{RANK_2 , RANK_7 , FILE_A , FILE_H};
+
+impl Board {
+    pub fn generate_knight_moves(&self, moves: &mut Vec<Move>) {
+        // let mut moves = Vec::new();
+        let enemy_bits = self.get_enemy_pieces().0;
+        let allay_bits = self.get_allay_pieces().0;
+
+        let (mut knights, piece_type) = match self.turn {
+            Turn::WHITE => (self.bitboards.white_knights.0, PieceType::WhiteKnight),
+            Turn::BLACK => (self.bitboards.black_knights.0, PieceType::BlackKnight),
+        };
+
+        while knights != 0 {
+            let from = knights.trailing_zeros() as u64;
+            knights &= knights - 1;
+            let mut attacks = KNIGHTS_ATTACK_TABLE.get(from as usize).unwrap() & !allay_bits;
+
+            while attacks != 0 {
+                let to = attacks.trailing_zeros() as u64;
+                attacks &= attacks - 1;
+                let capture = (enemy_bits & to) != 0;
+                moves.push(Move::new(from.into(), to.into(), capture, piece_type, None));
+            }
+        }
+    } //
+
+    pub fn generate_king_moves(&self, moves: &mut Vec<Move>) {
+        // let mut moves = Vec::new();
+        let enemy_bits = self.get_enemy_pieces().0;
+        let allay_bits = self.get_allay_pieces().0;
+
+        let (king, piece_type) = match self.turn {
+            Turn::WHITE => (self.bitboards.white_king.0, PieceType::WhiteKing),
+            Turn::BLACK => (self.bitboards.black_king.0, PieceType::BlackKing),
+        };
+
+        let from = king.trailing_zeros() as u64;
+        let mut attacks = KING_ATTACK_TABLE.get(from as usize).unwrap() & !allay_bits;
+
+        while attacks != 0 {
+            let to = attacks.trailing_zeros() as u64;
+            attacks &= attacks - 1;
+            let capture = (enemy_bits & to) != 0;
+            moves.push(Move::new(from.into(), to.into(), capture, piece_type, None));
+        }
+    } //
+
+    pub fn generate_white_pawns_moves(&self, moves: &mut Vec<Move>) {
+        let blockers = self.occupied.0;
+        // let pawn_squares = &self.bitboards.white_pawns;
+
+        let enemy_pieces_bb = self.get_all_black_bits();
+
+        let mut add = |from: u64, to: u64, capture: bool| {
+            moves.push(Move::new(
+                from.into(),
+                to.into(),
+                capture,
+                PieceType::WhitePawn,
+                None,
+            ));
+        };
+
+        let mut pawns = self.bitboards.white_pawns.0;
+
+        while pawns != 0 {
+            let from = pawns.trailing_zeros() as u64;
+            pawns &= pawns - 1;
+
+            let pawn_bb = 1u64 << from;
+
+            // single and double jump
+            if from < 55 && (blockers & 1u64 << from + 8) == 0 {
+                add(from.into(), (from + 8).into(), false);
+                if (((1u64 << from) & RANK_2) != 0) && (blockers & 1u64 << (from + 16)) == 0 {
+                    add(from.into(), (from + 16).into(), false);
+                }
+            }
+
+            // attacks
+            let attacks_bb = WHITE_PAWN_ATTACKS[from as usize];
+            let mut attacks = attacks_bb & enemy_pieces_bb.0;
+            while attacks != 0 {
+                let to = attacks.trailing_zeros() as u64;
+                attacks &= attacks - 1;
+                add(from.into(), to.into(), true);
+            }
+        }
+    } //
+
+    pub fn generate_black_pawns_moves(&self, moves: &mut Vec<Move>) {
+        let blockers = self.get_all_white_bits().0 | self.get_all_black_bits().0;
+        let enemy_pieces_bb = self.get_all_white_bits();
+
+        let mut add = |from: u64, to: u64, capture: bool| {
+            moves.push(Move::new(
+                from.into(),
+                to.into(),
+                capture,
+                PieceType::BlackPawn,
+                None,
+            ));
+        };
+
+        let mut pawns = self.bitboards.black_pawns.0;
+
+        while pawns != 0 {
+            let from = pawns.trailing_zeros() as u64;
+            pawns &= pawns - 1;
+
+            let pawn_bb = 1u64 << from;
+
+            // single and double jump
+            if from >= 8 && (blockers & 1u64 << (from - 8)) == 0 {
+                add(from.into(), (from - 8).into(), false);
+                if (((1u64 << from) & RANK_7) != 0) && (blockers & (1u64 << (from - 16))) == 0 {
+                    add(from.into(), (from - 16).into(), false);
+                }
+            }
+            // attacks
+            let attacks_bb = BLACK_PAWN_ATTACKS[from as usize];
+            let mut attacks = attacks_bb & enemy_pieces_bb.0;
+            while attacks != 0 {
+                let to = attacks.trailing_zeros() as u64;
+                attacks &= attacks - 1;
+                add(from.into(), to.into(), true);
+            }
+        }
+    } //
+
+    pub fn generate_rook_moves(&self, moves: &mut Vec<Move>) {
+        let allay = self.get_allay_pieces().0;
+        let enemy = self.get_enemy_pieces().0;
+
+        let (mut rooks, piece_type) = match self.turn {
+            Turn::WHITE => (self.bitboards.white_rooks.0, PieceType::WhiteRook),
+            Turn::BLACK => (self.bitboards.black_rooks.0, PieceType::BlackRook),
+        };
+
+        let mut add = |from: u64, to: u64, capture: bool| {
+            moves.push(Move::new(from, to, capture, piece_type, None));
+        };
+
+        while rooks != 0 {
+            let from = rooks.trailing_zeros() as u64;
+            rooks &= rooks - 1;
+
+            /* ================= NORTH ================= */
+            let mut to = from + 8;
+            while to < 64 {
+                let bb = 1u64 << to;
+                if allay & bb != 0 {
+                    break;
+                }
+                if enemy & bb != 0 {
+                    add(from, to, true);
+                    break;
+                }
+                add(from, to, false);
+                to += 8;
+            }
+
+            /* ================= SOUTH ================= */
+            if from >= 8 {
+                let mut to = from - 8;
+                loop {
+                    let bb = 1u64 << to;
+                    if allay & bb != 0 {
+                        break;
+                    }
+                    if enemy & bb != 0 {
+                        add(from, to, true);
+                        break;
+                    }
+                    add(from, to, false);
+                    if to < 8 {
+                        break;
+                    }
+                    to -= 8;
+                }
+            }
+
+            /* ================= EAST ================= */
+            let mut to = from + 1;
+            while to < 64 && to % 8 != 0 {
+                let bb = 1u64 << to;
+                if allay & bb != 0 {
+                    break;
+                }
+                if enemy & bb != 0 {
+                    add(from, to, true);
+                    break;
+                }
+                add(from, to, false);
+                to += 1;
+            }
+
+            /* ================= WEST ================= */
+            if from % 8 != 0 {
+                let mut to = from - 1;
+                loop {
+                    let bb = 1u64 << to;
+                    if allay & bb != 0 {
+                        break;
+                    }
+                    if enemy & bb != 0 {
+                        add(from, to, true);
+                        break;
+                    }
+                    add(from, to, false);
+                    if to % 8 == 0 {
+                        break;
+                    }
+                    to -= 1;
+                }
+            }
+        }
+    } //
+
+    pub fn generate_bishop_moves(&self, moves: &mut Vec<Move>) {
+        let allay_bits = &self.get_allay_pieces();
+        let enemy_bits = &self.get_enemy_pieces();
+        let all_bits = &self.occupied.0;
+
+        let (mut bishops, piece_type) = match self.turn {
+            Turn::WHITE => (self.bitboards.white_bishops.0, PieceType::WhiteBishop),
+            Turn::BLACK => (self.bitboards.black_bishops.0, PieceType::BlackBishop),
+        };
+
+        let mut add = |from: u64, to: u64, capture: bool| {
+            moves.push(Move::new(from.into(), to.into(), capture, piece_type, None));
+        };
+
+        while bishops != 0 {
+            let from = bishops.trailing_zeros() as u64;
+            bishops &= bishops - 1;
+
+            // North East
+            let mut to = from + 9;
+            while to <= 63 && ((1u64 << to) & FILE_A) == 0 {
+                let to_mask = 1u64 << (to);
+                if all_bits & to_mask != 0 {
+                    if allay_bits.0 & to_mask != 0 {
+                        break;
+                    }
+                    add(from, to, true);
+                    break;
+                } else {
+                    add(from, to, false);
+                }
+                to += 9;
+            }
+
+            // North West
+            let mut to = from + 7;
+            while to <= 63 && ((1u64 << to) & FILE_H) == 0 {
+                let to_mask = 1u64 << (to);
+                if all_bits & to_mask != 0 {
+                    if allay_bits.0 & to_mask != 0 {
+                        break;
+                    }
+                    add(from, to, true);
+                    break;
+                } else {
+                    add(from, to, false);
+                }
+                to += 7;
+            }
+
+            // South East
+            if from >= 7 {
+                let mut to = from - 7;
+                while ((1u64 << to) & FILE_A) == 0 {
+                    let to_mask = 1u64 << (to);
+                    if all_bits & to_mask != 0 {
+                        if allay_bits.0 & to_mask != 0 {
+                            break;
+                        }
+                        add(from, to, true);
+                        break;
+                    } else {
+                        add(from, to, false);
+                    }
+                    if to >= 7 {
+                        to -= 7;
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            // South West
+            if from >= 9 {
+                let mut to = from - 9;
+                while ((1u64 << to) & FILE_H) == 0 {
+                    let to_mask = 1u64 << (to);
+                    if all_bits & to_mask != 0 {
+                        if allay_bits.0 & to_mask != 0 {
+                            break;
+                        }
+                        add(from, to, true);
+                        break;
+                    } else {
+                        add(from, to, false);
+                    }
+                    if to >= 9 {
+                        to -= 9;
+                    } else {
+                        break;
+                    }
+                }
+            };
+        }
+    } //
+
+    pub fn generate_queen_moves(&self, moves: &mut Vec<Move>) {
+        let allay_bits = &self.get_allay_pieces();
+        let enemy_bits = &self.get_enemy_pieces();
+        let occupied = self.occupied.0;
+
+        let (mut queen_bits, piece_type) = match self.turn {
+            Turn::WHITE => (self.bitboards.white_queens.0, PieceType::WhiteQueen),
+            Turn::BLACK => (self.bitboards.black_queens.0, PieceType::BlackQueen),
+        };
+
+        let mut add = |from: u64, to: u64, capture: bool| {
+            moves.push(Move::new(from.into(), to.into(), capture, piece_type, None));
+        };
+
+        while queen_bits != 0 {
+            let from = queen_bits.trailing_zeros() as u64;
+            queen_bits &= queen_bits - 1;
+
+            // BISHOPS
+            // North East
+            // let mut to = from + 9;
+            // while to <= 63 && to % 8 != 0 {
+            //     let to_mask = 1u64 << (to);
+            //     if allay_bits.0 & to_mask != 0 {
+            //         break;
+            //     }
+            //     add(from, to, (enemy_bits.0 & to_mask) != 0);
+            //     if occupied & to_mask != 0 {
+            //         break;
+            //     };
+            //     to += 9;
+            // }
+            // // North West
+            // let mut to = from + 7;
+            // while to <= 63 && to % 8 != 7 {
+            //     let to_mask = 1u64 << (to);
+            //     if allay_bits.0 & to_mask != 0 {
+            //         break;
+            //     }
+            //     add(from, to, (enemy_bits.0 & to_mask) != 0);
+            //     if occupied & to_mask != 0 {
+            //         break;
+            //     };
+            //     to += 7;
+            // }
+            // // South East
+            // if from >= 7 {
+            //     let mut to = from - 7;
+            //     while to % 8 != 0 {
+            //         let to_mask = 1u64 << (to);
+            //         if allay_bits.0 & to_mask != 0 {
+            //             break;
+            //         }
+            //         add(from, to, (enemy_bits.0 & to_mask) != 0);
+            //         if occupied & to_mask != 0 {
+            //             break;
+            //         };
+            //         if to > 7 {
+            //             to -= 7;
+            //         } else {
+            //             break;
+            //         }
+            //     }
+            // };
+            // // South West
+            // if from >= 9 {
+            //     let mut to = from - 9;
+            //     while to > 0 && to % 8 != 7 {
+            //         let to_mask = 1u64 << (to);
+            //         if allay_bits.0 & to_mask != 0 {
+            //             break;
+            //         }
+            //         add(from, to, (enemy_bits.0 & to_mask) != 0);
+            //         if occupied & to_mask != 0 {
+            //             break;
+            //         };
+            //         if to > 9 {
+            //             to -= 9;
+            //         } else {
+            //             break;
+            //         }
+            //     }
+            // }
+
+            // North East
+            let mut to = from + 9;
+            while to <= 63 && ((1u64 << to) & FILE_A) == 0 {
+                let to_mask = 1u64 << (to);
+                if occupied & to_mask != 0 {
+                    if allay_bits.0 & to_mask != 0 {
+                        break;
+                    }
+                    add(from, to, true);
+                    break;
+                } else {
+                    add(from, to, false);
+                }
+                to += 9;
+            }
+
+            // North West
+            let mut to = from + 7;
+            while to <= 63 && ((1u64 << to) & FILE_H) == 0 {
+                let to_mask = 1u64 << (to);
+                if occupied & to_mask != 0 {
+                    if allay_bits.0 & to_mask != 0 {
+                        break;
+                    }
+                    add(from, to, true);
+                    break;
+                } else {
+                    add(from, to, false);
+                }
+                to += 7;
+            }
+
+            // South East
+            if from >= 7 {
+                let mut to = from - 7;
+                while ((1u64 << to) & FILE_A) == 0 {
+                    let to_mask = 1u64 << (to);
+                    if occupied & to_mask != 0 {
+                        if allay_bits.0 & to_mask != 0 {
+                            break;
+                        }
+                        add(from, to, true);
+                        break;
+                    } else {
+                        add(from, to, false);
+                    }
+                    if to >= 7 {
+                        to -= 7;
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            // South West
+            if from >= 9 {
+                let mut to = from - 9;
+                while ((1u64 << to) & FILE_H) == 0 {
+                    let to_mask = 1u64 << (to);
+                    if occupied & to_mask != 0 {
+                        if allay_bits.0 & to_mask != 0 {
+                            break;
+                        }
+                        add(from, to, true);
+                        break;
+                    } else {
+                        add(from, to, false);
+                    }
+                    if to >= 9 {
+                        to -= 9;
+                    } else {
+                        break;
+                    }
+                }
+            };
+
+            // ROOKS
+            // North
+            if from < 56 {
+                for to in ((from + 8)..=63).step_by(8) {
+                    let to_mask = 1u64 << (to);
+                    if allay_bits.0 & to_mask != 0 {
+                        break;
+                    }
+                    add(from, to, (enemy_bits.0 & to_mask) != 0);
+                    if occupied & to_mask != 0 {
+                        break;
+                    };
+                }
+            };
+            // South
+            if from > 7 {
+                for to in (0..=(from - 8)).rev().step_by(8) {
+                    let to_mask = 1u64 << (to);
+                    if allay_bits.0 & to_mask != 0 {
+                        break;
+                    }
+                    add(from, to, (enemy_bits.0 & to_mask) != 0);
+                    if occupied & to_mask != 0 {
+                        break;
+                    };
+                }
+            };
+
+            // East
+            if from % 8 != 7 {
+                let mut to = from + 1;
+                while to < 64 && to % 8 != 0 {
+                    let to_mask = 1u64 << (to);
+                    if allay_bits.0 & to_mask != 0 {
+                        break;
+                    }
+                    add(from, to, (enemy_bits.0 & to_mask) != 0);
+                    if occupied & to_mask != 0 {
+                        break;
+                    };
+                    to += 1;
+                }
+            };
+
+            // West
+            if from % 8 != 0 {
+                let mut to = from - 1;
+                loop {
+                    let to_mask = 1u64 << (to);
+                    if allay_bits.0 & to_mask != 0 {
+                        break;
+                    }
+                    add(from, to, (enemy_bits.0 & to_mask) != 0);
+                    if occupied & to_mask != 0 {
+                        break;
+                    }
+                    if to % 8 == 0 {
+                        break;
+                    }
+                    to -= 1;
+                }
+            };
+        }
+    } //
+
+    #[inline]
+    pub fn is_check_by_bishop(&self, king_bb: u64, sliders: u64) -> bool {
+        let occ = self.occupied.0;
+        let k = king_bb.trailing_zeros() as i32;
+
+        let mut all_locations = 0u64;
+
+        // NE
+        let mut sq = k + 9;
+        while sq < 64 && ((1u64 << sq) & FILE_A) == 0 {
+            let bb = 1u64 << sq;
+            all_locations |= bb;
+            if occ & bb != 0 {
+                if sliders & bb != 0 {
+                    return true;
+                }
+                break;
+            }
+            sq += 9;
+        }
+
+        // NW
+        let mut sq = k + 7;
+        while sq < 64 && ((1u64 << sq) & FILE_H) == 0 {
+            let bb = 1u64 << sq;
+            all_locations |= bb;
+            if occ & bb != 0 {
+                if sliders & bb != 0 {
+                    return true;
+                }
+                break;
+            }
+            sq += 7;
+        }
+
+        // SE
+        let mut sq = k - 7;
+        while sq >= 0 && ((1u64 << sq) & FILE_A) == 0 {
+            let bb = 1u64 << sq;
+            all_locations |= bb;
+            if occ & bb != 0 {
+                if sliders & bb != 0 {
+                    return true;
+                }
+                break;
+            }
+            sq -= 7;
+        }
+
+        // SW
+        let mut sq = k - 9;
+        while sq >= 0 && ((1u64 << sq) & FILE_H) == 0 {
+            let bb = 1u64 << sq;
+            all_locations |= bb;
+            if occ & bb != 0 {
+                if sliders & bb != 0 {
+                    return true;
+                }
+                break;
+            }
+            sq -= 9;
+        }
+
+        // all_locations & sliders != 0
+        false
+    }
+
+    #[inline(always)]
+    pub fn is_check_by_rook(&self, king_bb: u64, sliders: u64) -> bool {
+        let occ = self.occupied.0;
+        let k = king_bb.trailing_zeros() as i32;
+        let rank = k & 56;
+
+        // North / South
+        let mut sq = k + 8;
+        while sq < 64 {
+            let bb = 1u64 << sq;
+            if occ & bb != 0 {
+                if sliders & bb != 0 {
+                    return true;
+                }
+                break;
+            }
+            sq += 8;
+        }
+
+        let mut sq = k - 8;
+        while sq >= 0 {
+            let bb = 1u64 << sq;
+            if occ & bb != 0 {
+                if sliders & bb != 0 {
+                    return true;
+                }
+                break;
+            }
+            sq -= 8;
+        }
+
+        // East / West
+        let mut sq = k + 1;
+        while sq < 64 && (sq & 56) == rank {
+            let bb = 1u64 << sq;
+            if occ & bb != 0 {
+                if sliders & bb != 0 {
+                    return true;
+                }
+                break;
+            }
+            sq += 1;
+        }
+
+        let mut sq = k - 1;
+        while sq >= 0 && (sq & 56) == rank {
+            let bb = 1u64 << sq;
+            if occ & bb != 0 {
+                if sliders & bb != 0 {
+                    return true;
+                }
+                break;
+            }
+            sq -= 1;
+        }
+
+        false
+    } //
+
+    pub fn generate_pesudo_moves(&self, mut moves: &mut Vec<Move>) {
+        self.generate_knight_moves(&mut moves);
+        self.generate_bishop_moves(&mut moves);
+        self.generate_rook_moves(&mut moves);
+        self.generate_queen_moves(&mut moves);
+        self.generate_king_moves(&mut moves);
+
+        match self.turn {
+            Turn::WHITE => self.generate_white_pawns_moves(&mut moves),
+            Turn::BLACK => self.generate_black_pawns_moves(&mut moves),
+        };
+    } //
+
+    pub fn generate_moves(&mut self) -> Vec<Move> {
+        let mut pesudo_moves: Vec<Move> = Vec::new();
+        let mut legal_moves: Vec<Move> = Vec::new();
+
+        self.generate_pesudo_moves(&mut pesudo_moves);
+
+        let king_bb = match self.turn {
+            Turn::WHITE => self.bitboards.white_king.0,
+            Turn::BLACK => self.bitboards.black_king.0,
+        };
+
+        let king_type = match self.turn {
+            Turn::WHITE => PieceType::WhiteKing,
+            Turn::BLACK => PieceType::BlackKing,
+        };
+
+        let is_king_in_check_now = self.is_king_in_check(self.turn);
+        let king_square = king_bb.trailing_zeros() as usize;
+
+        for mv in pesudo_moves {
+            if !is_king_in_check_now {
+                if ((1u64 << mv.from) & SQUARE_RAYS[king_square]) == 0 && mv.piece_type != king_type
+                {
+                    legal_moves.push(mv);
+                    continue;
+                }
+            } else {
+                if (1u64 << mv.to) & (SQUARE_RAYS[king_square] | KNIGHTS_ATTACK_TABLE[king_square])
+                    == 0
+                    && mv.piece_type != king_type
+                {
+                    continue;
+                }
+            }
+
+            let old_bitboards = self.bitboards;
+            self.make_move(mv);
+            self.switch_turn();
+            let is_illegal = self.is_king_in_check(self.turn);
+            if !is_illegal {
+                legal_moves.push(mv);
+            }
+            self.bitboards = old_bitboards;
+        }
+        return legal_moves;
+    } //
+
+    pub fn is_king_in_check(&self, turn: Turn) -> bool {
+        let (king, enemy_king) = match turn {
+            Turn::BLACK => (&self.bitboards.black_king.0, &self.bitboards.white_king.0),
+            Turn::WHITE => (&self.bitboards.white_king.0, &self.bitboards.black_king.0),
+        };
+
+        let king_square = king.trailing_zeros() as u64;
+
+        let enemy_rooks = match turn {
+            Turn::BLACK => &self.bitboards.white_rooks.0,
+            Turn::WHITE => &self.bitboards.black_rooks.0,
+        };
+        let enemy_queens = match turn {
+            Turn::BLACK => &self.bitboards.white_queens.0,
+            Turn::WHITE => &self.bitboards.black_queens.0,
+        };
+        let enemy_bishops = match turn {
+            Turn::BLACK => &self.bitboards.white_bishops.0,
+            Turn::WHITE => &self.bitboards.black_bishops.0,
+        };
+        let enemy_knights = match turn {
+            Turn::BLACK => &self.bitboards.white_knights.0,
+            Turn::WHITE => &self.bitboards.black_knights.0,
+        };
+        let enemy_pawns = match turn {
+            Turn::BLACK => &self.bitboards.white_pawns.0,
+            Turn::WHITE => &self.bitboards.black_pawns.0,
+        };
+
+        let is_attacked_by_knights =
+            (KNIGHTS_ATTACK_TABLE.get(king_square as usize).unwrap() & enemy_knights) != 0;
+
+        if is_attacked_by_knights {
+            return true;
+        }
+
+        let is_attacked_by_king =
+            (KING_ATTACK_TABLE.get(king_square as usize).unwrap() & enemy_king) != 0;
+
+        if is_attacked_by_king {
+            return true;
+        }
+
+        let is_attacked_by_bishops_or_queens =
+            self.is_check_by_bishop(*king, *enemy_bishops | *enemy_queens);
+
+        if is_attacked_by_bishops_or_queens {
+            return true;
+        }
+
+        let is_attacked_by_rooks_or_queens =
+            self.is_check_by_rook(*king, *enemy_rooks | *enemy_queens);
+
+        if is_attacked_by_rooks_or_queens {
+            return true;
+        }
+
+        match turn {
+            Turn::BLACK => {
+                let mask = BLACK_PAWN_ATTACKS[king_square as usize];
+                if enemy_pawns & mask != 0 {
+                    return true;
+                }
+            }
+            Turn::WHITE => {
+                let mask = WHITE_PAWN_ATTACKS[king_square as usize];
+                if enemy_pawns & mask != 0 {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    } //
+
+    pub fn make_move(&mut self, mv: Move) {
+        let mut captured_piece_type = None;
+        if self.bitboards.white_pawns.0 & (1u64 << mv.to) != 0 {
+            captured_piece_type = Some(PieceType::WhitePawn);
+        } else if self.bitboards.white_knights.0 & (1u64 << mv.to) != 0 {
+            captured_piece_type = Some(PieceType::WhiteKnight);
+        } else if self.bitboards.white_bishops.0 & (1u64 << mv.to) != 0 {
+            captured_piece_type = Some(PieceType::WhiteBishop);
+        } else if self.bitboards.white_rooks.0 & (1u64 << mv.to) != 0 {
+            captured_piece_type = Some(PieceType::WhiteRook);
+        } else if self.bitboards.white_queens.0 & (1u64 << mv.to) != 0 {
+            captured_piece_type = Some(PieceType::WhiteQueen);
+        } else if self.bitboards.white_king.0 & (1u64 << mv.to) != 0 {
+            captured_piece_type = Some(PieceType::WhiteKing);
+        } else if self.bitboards.black_pawns.0 & (1u64 << mv.to) != 0 {
+            captured_piece_type = Some(PieceType::BlackPawn);
+        } else if self.bitboards.black_knights.0 & (1u64 << mv.to) != 0 {
+            captured_piece_type = Some(PieceType::BlackKnight);
+        } else if self.bitboards.black_bishops.0 & (1u64 << mv.to) != 0 {
+            captured_piece_type = Some(PieceType::BlackBishop);
+        } else if self.bitboards.black_rooks.0 & (1u64 << mv.to) != 0 {
+            captured_piece_type = Some(PieceType::BlackRook);
+        } else if self.bitboards.black_queens.0 & (1u64 << mv.to) != 0 {
+            captured_piece_type = Some(PieceType::BlackQueen);
+        } else if self.bitboards.black_king.0 & (1u64 << mv.to) != 0 {
+            captured_piece_type = Some(PieceType::BlackKing);
+        }
+
+        if let Some(piece_type) = captured_piece_type {
+            match piece_type {
+                PieceType::WhitePawn => self.bitboards.white_pawns.0 &= !(1u64 << mv.to),
+                PieceType::WhiteKnight => self.bitboards.white_knights.0 &= !(1u64 << mv.to),
+                PieceType::WhiteBishop => self.bitboards.white_bishops.0 &= !(1u64 << mv.to),
+                PieceType::WhiteRook => self.bitboards.white_rooks.0 &= !(1u64 << mv.to),
+                PieceType::WhiteQueen => self.bitboards.white_queens.0 &= !(1u64 << mv.to),
+                PieceType::WhiteKing => self.bitboards.white_king.0 &= !(1u64 << mv.to),
+                PieceType::BlackPawn => self.bitboards.black_pawns.0 &= !(1u64 << mv.to),
+                PieceType::BlackKnight => self.bitboards.black_knights.0 &= !(1u64 << mv.to),
+                PieceType::BlackBishop => self.bitboards.black_bishops.0 &= !(1u64 << mv.to),
+                PieceType::BlackRook => self.bitboards.black_rooks.0 &= !(1u64 << mv.to),
+                PieceType::BlackQueen => self.bitboards.black_queens.0 &= !(1u64 << mv.to),
+                PieceType::BlackKing => self.bitboards.black_king.0 &= !(1u64 << mv.to),
+            };
+        };
+
+        match mv.piece_type {
+            PieceType::WhitePawn => {
+                self.bitboards.white_pawns.0 |= 1u64 << mv.to;
+                self.bitboards.white_pawns.0 &= !(1u64 << mv.from);
+            }
+            PieceType::WhiteKnight => {
+                self.bitboards.white_knights.0 |= 1u64 << mv.to;
+                self.bitboards.white_knights.0 &= !(1u64 << mv.from);
+            }
+            PieceType::WhiteBishop => {
+                self.bitboards.white_bishops.0 |= 1u64 << mv.to;
+                self.bitboards.white_bishops.0 &= !(1u64 << mv.from);
+            }
+            PieceType::WhiteRook => {
+                self.bitboards.white_rooks.0 |= 1u64 << mv.to;
+                self.bitboards.white_rooks.0 &= !(1u64 << mv.from);
+            }
+            PieceType::WhiteQueen => {
+                self.bitboards.white_queens.0 |= 1u64 << mv.to;
+                self.bitboards.white_queens.0 &= !(1u64 << mv.from);
+            }
+            PieceType::WhiteKing => {
+                self.bitboards.white_king.0 |= 1u64 << mv.to;
+                self.bitboards.white_king.0 &= !(1u64 << mv.from);
+            }
+            PieceType::BlackPawn => {
+                self.bitboards.black_pawns.0 |= 1u64 << mv.to;
+                self.bitboards.black_pawns.0 &= !(1u64 << mv.from);
+            }
+            PieceType::BlackKnight => {
+                self.bitboards.black_knights.0 |= 1u64 << mv.to;
+                self.bitboards.black_knights.0 &= !(1u64 << mv.from);
+            }
+            PieceType::BlackBishop => {
+                self.bitboards.black_bishops.0 |= 1u64 << mv.to;
+                self.bitboards.black_bishops.0 &= !(1u64 << mv.from);
+            }
+            PieceType::BlackRook => {
+                self.bitboards.black_rooks.0 |= 1u64 << mv.to;
+                self.bitboards.black_rooks.0 &= !(1u64 << mv.from);
+            }
+            PieceType::BlackQueen => {
+                self.bitboards.black_queens.0 |= 1u64 << mv.to;
+                self.bitboards.black_queens.0 &= !(1u64 << mv.from);
+            }
+            PieceType::BlackKing => {
+                self.bitboards.black_king.0 |= 1u64 << mv.to;
+                self.bitboards.black_king.0 &= !(1u64 << mv.from);
+            }
+        };
+        self.turn = match self.turn {
+            Turn::WHITE => Turn::BLACK,
+            Turn::BLACK => Turn::WHITE,
+        };
+        self.occupied = self.get_all_bits();
+        self.undo = Some(mv);
+    } //
+
+    pub fn undo_move(&mut self) {
+        if let Some(mv) = self.undo {
+            if let Some(piece_type) = mv.captured_piece {
+                match piece_type {
+                    PieceType::WhitePawn => self.bitboards.white_pawns.0 |= 1u64 << mv.to,
+                    PieceType::WhiteKnight => self.bitboards.white_knights.0 |= 1u64 << mv.to,
+                    PieceType::WhiteBishop => self.bitboards.white_bishops.0 |= 1u64 << mv.to,
+                    PieceType::WhiteRook => self.bitboards.white_rooks.0 |= 1u64 << mv.to,
+                    PieceType::WhiteQueen => self.bitboards.white_queens.0 |= 1u64 << mv.to,
+                    PieceType::WhiteKing => self.bitboards.white_king.0 |= 1u64 << mv.to,
+                    PieceType::BlackPawn => self.bitboards.black_pawns.0 |= 1u64 << mv.to,
+                    PieceType::BlackKnight => self.bitboards.black_knights.0 |= 1u64 << mv.to,
+                    PieceType::BlackBishop => self.bitboards.black_bishops.0 |= 1u64 << mv.to,
+                    PieceType::BlackRook => self.bitboards.black_rooks.0 |= 1u64 << mv.to,
+                    PieceType::BlackQueen => self.bitboards.black_queens.0 |= 1u64 << mv.to,
+                    PieceType::BlackKing => self.bitboards.black_king.0 |= 1u64 << mv.to,
+                };
+            };
+
+            self.turn = match self.turn {
+                Turn::WHITE => Turn::BLACK,
+                Turn::BLACK => Turn::WHITE,
+            };
+
+            match mv.piece_type {
+                PieceType::WhitePawn => {
+                    self.bitboards.white_pawns.0 &= !(1u64 << mv.to);
+                    self.bitboards.white_pawns.0 |= 1u64 << mv.from;
+                }
+                PieceType::WhiteKnight => {
+                    self.bitboards.white_knights.0 &= !(1u64 << mv.to);
+                    self.bitboards.white_knights.0 |= 1u64 << mv.from;
+                }
+                PieceType::WhiteBishop => {
+                    self.bitboards.white_bishops.0 &= !(1u64 << mv.to);
+                    self.bitboards.white_bishops.0 |= 1u64 << mv.from;
+                }
+                PieceType::WhiteRook => {
+                    self.bitboards.white_rooks.0 &= !(1u64 << mv.to);
+                    self.bitboards.white_rooks.0 |= 1u64 << mv.from;
+                }
+                PieceType::WhiteQueen => {
+                    self.bitboards.white_queens.0 &= !(1u64 << mv.to);
+                    self.bitboards.white_queens.0 |= 1u64 << mv.from;
+                }
+                PieceType::WhiteKing => {
+                    self.bitboards.white_king.0 &= !(1u64 << mv.to);
+                    self.bitboards.white_king.0 |= 1u64 << mv.from;
+                }
+                PieceType::BlackPawn => {
+                    self.bitboards.black_pawns.0 &= !(1u64 << mv.to);
+                    self.bitboards.black_pawns.0 |= 1u64 << mv.from;
+                }
+                PieceType::BlackKnight => {
+                    self.bitboards.black_knights.0 &= !(1u64 << mv.to);
+                    self.bitboards.black_knights.0 |= 1u64 << mv.from;
+                }
+                PieceType::BlackBishop => {
+                    self.bitboards.black_bishops.0 &= !(1u64 << mv.to);
+                    self.bitboards.black_bishops.0 |= 1u64 << mv.from;
+                }
+                PieceType::BlackRook => {
+                    self.bitboards.black_rooks.0 &= !(1u64 << mv.to);
+                    self.bitboards.black_rooks.0 |= 1u64 << mv.from;
+                }
+                PieceType::BlackQueen => {
+                    self.bitboards.black_queens.0 &= !(1u64 << mv.to);
+                    self.bitboards.black_queens.0 |= 1u64 << mv.from;
+                }
+                PieceType::BlackKing => {
+                    self.bitboards.black_king.0 &= !(1u64 << mv.to);
+                    self.bitboards.black_king.0 |= 1u64 << mv.from;
+                }
+            };
+
+            self.undo = None;
+        }
+    } //
+}
