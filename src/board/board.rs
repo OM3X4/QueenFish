@@ -1,35 +1,70 @@
-use super::{BitBoard, BitBoards, Move, Turn , GameState};
-use super::constants::{RANK_1 , RANK_2, RANK_7, RANK_8};
+use crate::board::PieceType;
 
-#[derive(Debug, Copy, Clone)]
+use super::constants::{RANK_1, RANK_2, RANK_7, RANK_8};
+use super::{BitBoard, BitBoards, GameState, Turn};
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Board {
     pub bitboards: BitBoards,
-    pub undo: Option<Move>,
     pub turn: Turn,
     pub occupied: BitBoard,
+    pub hash: u64,
+    pub zobrist: Zobrist
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct Zobrist {
+    pub piece_square: [[u64; 64]; 12],
+    pub side_to_move: u64,
+}
 
+impl Zobrist {
+    pub fn init_zobrist() -> Zobrist {
+        let mut seed = 0xCAFEBABEDEADBEEF;
+
+        let mut piece_square = [[0u64; 64]; 12];
+        for p in 0..12 {
+            for sq in 0..64 {
+                piece_square[p][sq] = Board::splitmix64(&mut seed);
+            }
+        }
+
+        let side_to_move = Board::splitmix64(&mut seed);
+
+        Zobrist {
+            piece_square,
+            side_to_move,
+        }
+    }
+}
 
 impl Board {
     pub fn new() -> Board {
-        return Board {
+        let mut board =  Board {
             bitboards: BitBoards::default(),
-            undo: None,
             turn: Turn::WHITE,
+            hash: 0,
+            zobrist: Zobrist::init_zobrist(),
             occupied: BitBoard(RANK_1 | RANK_2 | RANK_7 | RANK_8),
         };
-    }//
+
+        board.hash = board.compute_hash();
+
+        board
+    } //
+
     pub fn reset_to_default(&mut self) {
         self.bitboards = BitBoards::default();
+        self.hash = self.compute_hash();
         self.occupied = BitBoard(RANK_1 | RANK_2 | RANK_7 | RANK_8);
         self.turn = Turn::WHITE;
-    }//
+    } //
     pub fn reset_to_zero(&mut self) {
         self.bitboards = BitBoards::zero();
         self.occupied = BitBoard(0);
+        self.hash = self.compute_hash();
         self.turn = Turn::WHITE;
-    }//
+    } //
     pub fn get_all_white_bits(&self) -> BitBoard {
         return BitBoard(
             self.bitboards.white_pawns.0
@@ -39,7 +74,7 @@ impl Board {
                 | self.bitboards.white_queens.0
                 | self.bitboards.white_king.0,
         );
-    }//
+    } //
     pub fn get_all_black_bits(&self) -> BitBoard {
         return BitBoard(
             self.bitboards.black_pawns.0
@@ -49,7 +84,7 @@ impl Board {
                 | self.bitboards.black_queens.0
                 | self.bitboards.black_king.0,
         );
-    }//
+    } //
     pub fn get_all_bits(&self) -> BitBoard {
         return BitBoard(
             self.bitboards.white_pawns.0
@@ -66,6 +101,37 @@ impl Board {
                 | self.bitboards.black_king.0,
         );
     } //
+
+    pub fn piece_at(&self, square: u64) -> Option<PieceType> {
+        let bb = 1u64 << square;
+        if self.bitboards.white_pawns.0 & bb != 0 {
+            return Some(PieceType::WhitePawn);
+        } else if self.bitboards.white_knights.0 & bb != 0 {
+            return Some(PieceType::WhiteKnight);
+        } else if self.bitboards.white_bishops.0 & bb != 0 {
+            return Some(PieceType::WhiteBishop);
+        } else if self.bitboards.white_rooks.0 & bb != 0 {
+            return Some(PieceType::WhiteRook);
+        } else if self.bitboards.white_queens.0 & bb != 0 {
+            return Some(PieceType::WhiteQueen);
+        } else if self.bitboards.white_king.0 & bb != 0 {
+            return Some(PieceType::WhiteKing);
+        } else if self.bitboards.black_pawns.0 & bb != 0 {
+            return Some(PieceType::BlackPawn);
+        } else if self.bitboards.black_knights.0 & bb != 0 {
+            return Some(PieceType::BlackKnight);
+        } else if self.bitboards.black_bishops.0 & bb != 0 {
+            return Some(PieceType::BlackBishop);
+        } else if self.bitboards.black_rooks.0 & bb != 0 {
+            return Some(PieceType::BlackRook);
+        } else if self.bitboards.black_queens.0 & bb != 0 {
+            return Some(PieceType::BlackQueen);
+        } else if self.bitboards.black_king.0 & bb != 0 {
+            return Some(PieceType::BlackKing);
+        } else {
+            return None;
+        }
+    }//
 
     pub fn load_from_fen(&mut self, fen: &str) {
         self.reset_to_zero();
@@ -184,14 +250,14 @@ impl Board {
             Turn::WHITE => self.get_all_black_bits(),
             Turn::BLACK => self.get_all_white_bits(),
         };
-    }//
+    } //
 
     pub fn get_allay_pieces(&self) -> BitBoard {
         return match self.turn {
             Turn::BLACK => self.get_all_black_bits(),
             Turn::WHITE => self.get_all_white_bits(),
         };
-    }//
+    } //
 
     pub fn switch_turn(&mut self) {
         self.turn = match self.turn {
@@ -210,15 +276,15 @@ impl Board {
         } else {
             return GameState::InProgress;
         }
-    }//
-}//
+    } //
+} //
 
 mod test {
 
-    use super::*;
-
     #[test]
     fn check_mate() {
+        use super::{Board, GameState};
+
         let mut board = Board::new();
         board.load_from_fen("rnbqkbnr/pppppQpp/8/8/2B5/8/PPPPPPPP/RNB1K1NR b");
 

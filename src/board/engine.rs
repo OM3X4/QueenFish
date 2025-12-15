@@ -1,6 +1,6 @@
-use crate::board;
+use std::collections::HashMap;
 
-use super::{Board, GameState, Turn};
+use super::{Board, GameState, Move, Turn};
 
 impl Board {
     /// The score is turn agnostic , it always returns the score of the white player
@@ -50,7 +50,7 @@ impl Board {
     } //
 
     //currently only play for white
-    pub fn minimax(&mut self, depth: i32) -> i32 {
+    pub fn minimax(&mut self, depth: i32, moves_map: &mut HashMap<u64, i32>) -> i32 {
         let game_state = self.get_game_state();
         if game_state == GameState::CheckMate {
             match self.turn {
@@ -61,57 +61,103 @@ impl Board {
             return 0;
         }
 
-        if depth >= 4 {
+        if depth >= 6 {
             return self.evaluate();
         }
 
         let best_score = 0;
 
-        let moves = self.generate_moves();
-        match self.turn {
-            Turn::WHITE => {
-                let mut best_score = i32::MIN;
-                for mv in moves {
-                    let old_bitmaps = self.bitboards;
-                    self.make_move(mv);
-                    let score = self.minimax(depth + 1);
-                    self.bitboards = old_bitmaps;
-                    if score > best_score {
-                        best_score = score;
+        let moves: Vec<Move>;
+        if let Some(score) = moves_map.get(&self.hash) {
+            // println!("Move Generation Skipped");
+            // moves = x.to_vec();
+            return *score;
+        } else {
+            let moves = self.generate_moves();
+            match self.turn {
+                Turn::WHITE => {
+                    let mut best_score = i32::MIN;
+                    for mv in moves {
+                        let old_bitmaps = self.bitboards;
+                        self.make_move(mv);
+                        let score = self.minimax(depth + 1, moves_map);
+                        self.bitboards = old_bitmaps;
+                        if score > best_score {
+                            best_score = score;
+                        }
                     }
-                }
-                return best_score;
-            }//
-            Turn::BLACK => {
-                let mut best_score = i32::MAX;
-                for mv in moves {
-                    let old_bitmaps = self.bitboards;
-                    self.make_move(mv);
-                    let score = self.minimax(depth + 1);
-                    self.bitboards = old_bitmaps;
-                    if score < best_score {
-                        best_score = score;
+                    moves_map.insert(self.hash, best_score);
+                    return best_score;
+                } //
+                Turn::BLACK => {
+                    let mut best_score = i32::MAX;
+                    for mv in moves {
+                        let old_bitmaps = self.bitboards;
+                        let old_occupied = self.occupied;
+                        let old_hash = self.hash;
+                        self.make_move(mv);
+
+                        let score = self.minimax(depth + 1, moves_map);
+
+                        self.switch_turn();
+                        self.hash = old_hash;
+                        self.occupied = old_occupied;
+                        self.bitboards = old_bitmaps;
+
+                        if score < best_score {
+                            best_score = score;
+                        }
                     }
-                }
-                return best_score;
-            }//
-        }//
-    }
+                    moves_map.insert(self.hash, best_score);
+                    return best_score;
+                } //
+            } //
+        }
+    } //
+
+    #[inline]
+    pub fn splitmix64(seed: &mut u64) -> u64 {
+        *seed = seed.wrapping_add(0x9E3779B97F4A7C15);
+        let mut z = *seed;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+        z ^ (z >> 31)
+    } //
+
+    pub fn compute_hash(&mut self) -> u64 {
+        let mut h = 0u64;
+        let z = &self.zobrist;
+
+        for sq in 0..64 {
+            if let Some(piece) = self.piece_at(sq) {
+                let piece_index = piece.piece_index();
+                h ^= z.piece_square[piece_index][sq as usize];
+            }
+        }
+
+        if self.turn == Turn::BLACK {
+            h ^= z.side_to_move;
+        }
+
+        h
+    }//
 }
 
 mod test {
-    use super::*;
-
     #[test]
     fn is_position_equal() {
+        use super::Board;
         let mut board = Board::new();
         assert_eq!(board.evaluate(), 0);
     }
 
     #[test]
     fn minimax() {
-        let mut board = Board::new();
-        println!("{}", board.minimax(0));
-    }
+        use super::{Board};
+        use std::collections::HashMap;
 
+        let mut board = Board::new();
+        let mut moves_map: HashMap<u64, i32> = HashMap::new();
+        println!("{}", board.minimax(0, &mut moves_map));
+    }
 }

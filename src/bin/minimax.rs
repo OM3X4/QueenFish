@@ -1,10 +1,12 @@
 fn main() {
     use chess::board::*;
+    use std::collections::HashMap;
 
     let start = std::time::Instant::now();
 
     let mut board = Board::new();
-    board.minimax(0);
+    let mut moves_map: HashMap<u64, i32> = HashMap::new();
+    board.minimax(0 , &mut moves_map);
     let end = std::time::Instant::now();
     let duration = end.duration_since(start);
     println!(

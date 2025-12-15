@@ -21,6 +21,26 @@ pub enum PieceType {
     BlackKing,
 } //
 
+impl PieceType {
+    #[inline]
+    pub fn piece_index(&self) -> usize {
+        match self {
+            PieceType::WhitePawn => 0,
+            PieceType::WhiteKnight => 1,
+            PieceType::WhiteBishop => 2,
+            PieceType::WhiteRook => 3,
+            PieceType::WhiteQueen => 4,
+            PieceType::WhiteKing => 5,
+            PieceType::BlackPawn => 6,
+            PieceType::BlackKnight => 7,
+            PieceType::BlackBishop => 8,
+            PieceType::BlackRook => 9,
+            PieceType::BlackQueen => 10,
+            PieceType::BlackKing => 11,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct Move {
     pub from: u64,
@@ -48,16 +68,16 @@ impl Move {
     }
 } //
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BitBoard(u64);
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Turn {
     WHITE,
     BLACK,
 } //
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct BitBoards {
     // white
     pub white_pawns: BitBoard,

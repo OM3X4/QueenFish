@@ -1,6 +1,8 @@
-use super::{Board , Move , PieceType , Turn};
-use super::constants::{KING_ATTACK_TABLE , KNIGHTS_ATTACK_TABLE , BLACK_PAWN_ATTACKS , WHITE_PAWN_ATTACKS , SQUARE_RAYS};
-use super::constants::{RANK_2 , RANK_7 , FILE_A , FILE_H};
+use super::constants::{
+    BLACK_PAWN_ATTACKS, KING_ATTACK_TABLE, KNIGHTS_ATTACK_TABLE, SQUARE_RAYS, WHITE_PAWN_ATTACKS,
+};
+use super::constants::{FILE_A, FILE_H, RANK_2, RANK_7};
+use super::{Board, Move, PieceType, Turn};
 
 impl Board {
     pub fn generate_knight_moves(&self, moves: &mut Vec<Move>) {
@@ -36,8 +38,6 @@ impl Board {
             Turn::WHITE => (self.bitboards.white_king.0, PieceType::WhiteKing),
             Turn::BLACK => (self.bitboards.black_king.0, PieceType::BlackKing),
         };
-
-
 
         let from = king.trailing_zeros() as u64;
         if from > 63 {
@@ -743,7 +743,6 @@ impl Board {
             Turn::WHITE => (&self.bitboards.white_king.0, &self.bitboards.black_king.0),
         };
 
-
         if king.trailing_zeros() > 63 {
             return false;
         }
@@ -816,185 +815,116 @@ impl Board {
         return false;
     } //
 
+    #[inline(always)]
     pub fn make_move(&mut self, mv: Move) {
-        let mut captured_piece_type = None;
-        if self.bitboards.white_pawns.0 & (1u64 << mv.to) != 0 {
-            captured_piece_type = Some(PieceType::WhitePawn);
-        } else if self.bitboards.white_knights.0 & (1u64 << mv.to) != 0 {
-            captured_piece_type = Some(PieceType::WhiteKnight);
-        } else if self.bitboards.white_bishops.0 & (1u64 << mv.to) != 0 {
-            captured_piece_type = Some(PieceType::WhiteBishop);
-        } else if self.bitboards.white_rooks.0 & (1u64 << mv.to) != 0 {
-            captured_piece_type = Some(PieceType::WhiteRook);
-        } else if self.bitboards.white_queens.0 & (1u64 << mv.to) != 0 {
-            captured_piece_type = Some(PieceType::WhiteQueen);
-        } else if self.bitboards.white_king.0 & (1u64 << mv.to) != 0 {
-            captured_piece_type = Some(PieceType::WhiteKing);
-        } else if self.bitboards.black_pawns.0 & (1u64 << mv.to) != 0 {
-            captured_piece_type = Some(PieceType::BlackPawn);
-        } else if self.bitboards.black_knights.0 & (1u64 << mv.to) != 0 {
-            captured_piece_type = Some(PieceType::BlackKnight);
-        } else if self.bitboards.black_bishops.0 & (1u64 << mv.to) != 0 {
-            captured_piece_type = Some(PieceType::BlackBishop);
-        } else if self.bitboards.black_rooks.0 & (1u64 << mv.to) != 0 {
-            captured_piece_type = Some(PieceType::BlackRook);
-        } else if self.bitboards.black_queens.0 & (1u64 << mv.to) != 0 {
-            captured_piece_type = Some(PieceType::BlackQueen);
-        } else if self.bitboards.black_king.0 & (1u64 << mv.to) != 0 {
-            captured_piece_type = Some(PieceType::BlackKing);
-        }
+        let from = mv.from as usize;
+        let to = mv.to as usize;
+        let z = &self.zobrist;
 
-        if let Some(piece_type) = captured_piece_type {
-            match piece_type {
-                PieceType::WhitePawn => self.bitboards.white_pawns.0 &= !(1u64 << mv.to),
-                PieceType::WhiteKnight => self.bitboards.white_knights.0 &= !(1u64 << mv.to),
-                PieceType::WhiteBishop => self.bitboards.white_bishops.0 &= !(1u64 << mv.to),
-                PieceType::WhiteRook => self.bitboards.white_rooks.0 &= !(1u64 << mv.to),
-                PieceType::WhiteQueen => self.bitboards.white_queens.0 &= !(1u64 << mv.to),
-                PieceType::WhiteKing => self.bitboards.white_king.0 &= !(1u64 << mv.to),
-                PieceType::BlackPawn => self.bitboards.black_pawns.0 &= !(1u64 << mv.to),
-                PieceType::BlackKnight => self.bitboards.black_knights.0 &= !(1u64 << mv.to),
-                PieceType::BlackBishop => self.bitboards.black_bishops.0 &= !(1u64 << mv.to),
-                PieceType::BlackRook => self.bitboards.black_rooks.0 &= !(1u64 << mv.to),
-                PieceType::BlackQueen => self.bitboards.black_queens.0 &= !(1u64 << mv.to),
-                PieceType::BlackKing => self.bitboards.black_king.0 &= !(1u64 << mv.to),
-            };
+        // =========================
+        // 1. Zobrist: remove captured piece
+        // =========================
+        if let Some(captured) = mv.captured_piece {
+            let cap_idx = captured.piece_index();
+            let to_mask = 1u64 << to;
+
+            // remove captured piece from bitboard
+            match captured {
+                PieceType::WhitePawn => self.bitboards.white_pawns.0 &= !to_mask,
+                PieceType::WhiteKnight => self.bitboards.white_knights.0 &= !to_mask,
+                PieceType::WhiteBishop => self.bitboards.white_bishops.0 &= !to_mask,
+                PieceType::WhiteRook => self.bitboards.white_rooks.0 &= !to_mask,
+                PieceType::WhiteQueen => self.bitboards.white_queens.0 &= !to_mask,
+                PieceType::WhiteKing => self.bitboards.white_king.0 &= !to_mask,
+                PieceType::BlackPawn => self.bitboards.black_pawns.0 &= !to_mask,
+                PieceType::BlackKnight => self.bitboards.black_knights.0 &= !to_mask,
+                PieceType::BlackBishop => self.bitboards.black_bishops.0 &= !to_mask,
+                PieceType::BlackRook => self.bitboards.black_rooks.0 &= !to_mask,
+                PieceType::BlackQueen => self.bitboards.black_queens.0 &= !to_mask,
+                PieceType::BlackKing => self.bitboards.black_king.0 &= !to_mask,
+            }
+
+            // Zobrist XOR out captured piece
+            self.hash ^= z.piece_square[cap_idx][to];
         };
+
+        // =========================
+        // 2. Move piece (bitboards)
+        // =========================
+        let from_mask = 1u64 << from;
+        let to_mask = 1u64 << to;
 
         match mv.piece_type {
             PieceType::WhitePawn => {
-                self.bitboards.white_pawns.0 |= 1u64 << mv.to;
-                self.bitboards.white_pawns.0 &= !(1u64 << mv.from);
+                self.bitboards.white_pawns.0 &= !from_mask;
+                self.bitboards.white_pawns.0 |= to_mask;
             }
             PieceType::WhiteKnight => {
-                self.bitboards.white_knights.0 |= 1u64 << mv.to;
-                self.bitboards.white_knights.0 &= !(1u64 << mv.from);
+                self.bitboards.white_knights.0 &= !from_mask;
+                self.bitboards.white_knights.0 |= to_mask;
             }
             PieceType::WhiteBishop => {
-                self.bitboards.white_bishops.0 |= 1u64 << mv.to;
-                self.bitboards.white_bishops.0 &= !(1u64 << mv.from);
+                self.bitboards.white_bishops.0 &= !from_mask;
+                self.bitboards.white_bishops.0 |= to_mask;
             }
             PieceType::WhiteRook => {
-                self.bitboards.white_rooks.0 |= 1u64 << mv.to;
-                self.bitboards.white_rooks.0 &= !(1u64 << mv.from);
+                self.bitboards.white_rooks.0 &= !from_mask;
+                self.bitboards.white_rooks.0 |= to_mask;
             }
             PieceType::WhiteQueen => {
-                self.bitboards.white_queens.0 |= 1u64 << mv.to;
-                self.bitboards.white_queens.0 &= !(1u64 << mv.from);
+                self.bitboards.white_queens.0 &= !from_mask;
+                self.bitboards.white_queens.0 |= to_mask;
             }
             PieceType::WhiteKing => {
-                self.bitboards.white_king.0 |= 1u64 << mv.to;
-                self.bitboards.white_king.0 &= !(1u64 << mv.from);
+                self.bitboards.white_king.0 &= !from_mask;
+                self.bitboards.white_king.0 |= to_mask;
             }
             PieceType::BlackPawn => {
-                self.bitboards.black_pawns.0 |= 1u64 << mv.to;
-                self.bitboards.black_pawns.0 &= !(1u64 << mv.from);
+                self.bitboards.black_pawns.0 &= !from_mask;
+                self.bitboards.black_pawns.0 |= to_mask;
             }
             PieceType::BlackKnight => {
-                self.bitboards.black_knights.0 |= 1u64 << mv.to;
-                self.bitboards.black_knights.0 &= !(1u64 << mv.from);
+                self.bitboards.black_knights.0 &= !from_mask;
+                self.bitboards.black_knights.0 |= to_mask;
             }
             PieceType::BlackBishop => {
-                self.bitboards.black_bishops.0 |= 1u64 << mv.to;
-                self.bitboards.black_bishops.0 &= !(1u64 << mv.from);
+                self.bitboards.black_bishops.0 &= !from_mask;
+                self.bitboards.black_bishops.0 |= to_mask;
             }
             PieceType::BlackRook => {
-                self.bitboards.black_rooks.0 |= 1u64 << mv.to;
-                self.bitboards.black_rooks.0 &= !(1u64 << mv.from);
+                self.bitboards.black_rooks.0 &= !from_mask;
+                self.bitboards.black_rooks.0 |= to_mask;
             }
             PieceType::BlackQueen => {
-                self.bitboards.black_queens.0 |= 1u64 << mv.to;
-                self.bitboards.black_queens.0 &= !(1u64 << mv.from);
+                self.bitboards.black_queens.0 &= !from_mask;
+                self.bitboards.black_queens.0 |= to_mask;
             }
             PieceType::BlackKing => {
-                self.bitboards.black_king.0 |= 1u64 << mv.to;
-                self.bitboards.black_king.0 &= !(1u64 << mv.from);
+                self.bitboards.black_king.0 &= !from_mask;
+                self.bitboards.black_king.0 |= to_mask;
             }
-        };
+        }
+
+        // =========================
+        // 3. Zobrist: move piece
+        // =========================
+        let piece_idx = mv.piece_type.piece_index();
+        self.hash ^= z.piece_square[piece_idx][from];
+        self.hash ^= z.piece_square[piece_idx][to];
+
+        // =========================
+        // 4. Update occupied
+        // =========================
+        self.occupied.0 &= !from_mask;
+        self.occupied.0 |= to_mask;
+
+        // =========================
+        // 5. Side to move
+        // =========================
         self.turn = match self.turn {
             Turn::WHITE => Turn::BLACK,
             Turn::BLACK => Turn::WHITE,
         };
-        self.occupied = self.get_all_bits();
-        self.undo = Some(mv);
-    } //
-
-    pub fn undo_move(&mut self) {
-        if let Some(mv) = self.undo {
-            if let Some(piece_type) = mv.captured_piece {
-                match piece_type {
-                    PieceType::WhitePawn => self.bitboards.white_pawns.0 |= 1u64 << mv.to,
-                    PieceType::WhiteKnight => self.bitboards.white_knights.0 |= 1u64 << mv.to,
-                    PieceType::WhiteBishop => self.bitboards.white_bishops.0 |= 1u64 << mv.to,
-                    PieceType::WhiteRook => self.bitboards.white_rooks.0 |= 1u64 << mv.to,
-                    PieceType::WhiteQueen => self.bitboards.white_queens.0 |= 1u64 << mv.to,
-                    PieceType::WhiteKing => self.bitboards.white_king.0 |= 1u64 << mv.to,
-                    PieceType::BlackPawn => self.bitboards.black_pawns.0 |= 1u64 << mv.to,
-                    PieceType::BlackKnight => self.bitboards.black_knights.0 |= 1u64 << mv.to,
-                    PieceType::BlackBishop => self.bitboards.black_bishops.0 |= 1u64 << mv.to,
-                    PieceType::BlackRook => self.bitboards.black_rooks.0 |= 1u64 << mv.to,
-                    PieceType::BlackQueen => self.bitboards.black_queens.0 |= 1u64 << mv.to,
-                    PieceType::BlackKing => self.bitboards.black_king.0 |= 1u64 << mv.to,
-                };
-            };
-
-            self.turn = match self.turn {
-                Turn::WHITE => Turn::BLACK,
-                Turn::BLACK => Turn::WHITE,
-            };
-
-            match mv.piece_type {
-                PieceType::WhitePawn => {
-                    self.bitboards.white_pawns.0 &= !(1u64 << mv.to);
-                    self.bitboards.white_pawns.0 |= 1u64 << mv.from;
-                }
-                PieceType::WhiteKnight => {
-                    self.bitboards.white_knights.0 &= !(1u64 << mv.to);
-                    self.bitboards.white_knights.0 |= 1u64 << mv.from;
-                }
-                PieceType::WhiteBishop => {
-                    self.bitboards.white_bishops.0 &= !(1u64 << mv.to);
-                    self.bitboards.white_bishops.0 |= 1u64 << mv.from;
-                }
-                PieceType::WhiteRook => {
-                    self.bitboards.white_rooks.0 &= !(1u64 << mv.to);
-                    self.bitboards.white_rooks.0 |= 1u64 << mv.from;
-                }
-                PieceType::WhiteQueen => {
-                    self.bitboards.white_queens.0 &= !(1u64 << mv.to);
-                    self.bitboards.white_queens.0 |= 1u64 << mv.from;
-                }
-                PieceType::WhiteKing => {
-                    self.bitboards.white_king.0 &= !(1u64 << mv.to);
-                    self.bitboards.white_king.0 |= 1u64 << mv.from;
-                }
-                PieceType::BlackPawn => {
-                    self.bitboards.black_pawns.0 &= !(1u64 << mv.to);
-                    self.bitboards.black_pawns.0 |= 1u64 << mv.from;
-                }
-                PieceType::BlackKnight => {
-                    self.bitboards.black_knights.0 &= !(1u64 << mv.to);
-                    self.bitboards.black_knights.0 |= 1u64 << mv.from;
-                }
-                PieceType::BlackBishop => {
-                    self.bitboards.black_bishops.0 &= !(1u64 << mv.to);
-                    self.bitboards.black_bishops.0 |= 1u64 << mv.from;
-                }
-                PieceType::BlackRook => {
-                    self.bitboards.black_rooks.0 &= !(1u64 << mv.to);
-                    self.bitboards.black_rooks.0 |= 1u64 << mv.from;
-                }
-                PieceType::BlackQueen => {
-                    self.bitboards.black_queens.0 &= !(1u64 << mv.to);
-                    self.bitboards.black_queens.0 |= 1u64 << mv.from;
-                }
-                PieceType::BlackKing => {
-                    self.bitboards.black_king.0 &= !(1u64 << mv.to);
-                    self.bitboards.black_king.0 |= 1u64 << mv.from;
-                }
-            };
-
-            self.undo = None;
-        }
-    } //
+        self.hash ^= z.side_to_move;
+    }
 }
