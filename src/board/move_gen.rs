@@ -964,14 +964,14 @@ impl Board {
         self.hash ^= *Z_SIDE;
 
 
-        let computed = self.compute_hash();
-        if computed != self.hash {
-            let diff = computed ^ self.hash;
-            println!("Hash Mismatch!");
-            println!("Move: {:?}", mv); // Ensure your Move struct derives Debug
-            println!("Diff value: {}", diff);
-            // If diff matches a Z_PIECE value, you know exactly which piece caused it.
-        }
+        // let computed = self.compute_hash();
+        // if computed != self.hash {
+        //     let diff = computed ^ self.hash;
+        //     println!("Hash Mismatch!");
+        //     println!("Move: {:?}", mv); // Ensure your Move struct derives Debug
+        //     println!("Diff value: {}", diff);
+        //     // If diff matches a Z_PIECE value, you know exactly which piece caused it.
+        // }
 
         return unmake_move;
     } //
