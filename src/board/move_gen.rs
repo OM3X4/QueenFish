@@ -241,7 +241,7 @@ impl Board {
         }
     } //
 
-    pub fn generate_rook_moves_magics(&self) {
+    pub fn generate_rook_moves_magics(&self , moves: &mut Vec<Move>) {
         let allay = self.get_allay_pieces().0;
         let enemy = self.get_enemy_pieces().0;
         let occupied = self.occupied.0;
@@ -251,9 +251,9 @@ impl Board {
             Turn::BLACK => (self.bitboards.black_rooks.0, PieceType::BlackRook),
         };
 
-        // let mut add = |from: u64, to: u64, capture: bool| {
-        //     moves.push(Move::new(from, to, capture, piece_type, None));
-        // };
+        let mut add = |from: u64, to: u64, capture: bool| {
+            moves.push(Move::new(from, to, capture, piece_type, None));
+        };
 
         while rooks != 0 {
             let from = rooks.trailing_zeros() as u64;
@@ -266,7 +266,7 @@ impl Board {
                 let to = attacks.trailing_zeros() as u64;
                 attacks &= attacks - 1;
                 let capture = (enemy & to) != 0;
-                // add(from, to, capture);
+                add(from, to, capture);
             }
         }
     }//
@@ -722,7 +722,8 @@ impl Board {
     pub fn generate_pesudo_moves(&self, mut moves: &mut Vec<Move>) {
         self.generate_knight_moves(&mut moves);
         self.generate_bishop_moves(&mut moves);
-        self.generate_rook_moves(&mut moves);
+        // self.generate_rook_moves(&mut moves);
+        self.generate_rook_moves_magics(&mut moves);
         self.generate_queen_moves(&mut moves);
         self.generate_king_moves(&mut moves);
 
