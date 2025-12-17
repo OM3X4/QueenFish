@@ -96,17 +96,37 @@ impl Board {
     /// The score is turn agnostic , it always returns the score of the white player
     pub fn pieces_score(&self) -> i32 {
         let mut score: i32 = 0;
-        let num_of_knights = (self.bitboards.0[PieceType::WhiteKnight.piece_index()]).0.count_ones();
-        let num_of_pawns = self.bitboards.0[PieceType::WhitePawn.piece_index()].0.count_ones();
-        let num_of_bishops = self.bitboards.0[PieceType::WhiteBishop.piece_index()].0.count_ones();
-        let num_of_rooks = self.bitboards.0[PieceType::WhiteRook.piece_index()].0.count_ones();
-        let num_of_queens = self.bitboards.0[PieceType::WhiteQueen.piece_index()].0.count_ones();
+        let num_of_knights = (self.bitboards.0[PieceType::WhiteKnight.piece_index()])
+            .0
+            .count_ones();
+        let num_of_pawns = self.bitboards.0[PieceType::WhitePawn.piece_index()]
+            .0
+            .count_ones();
+        let num_of_bishops = self.bitboards.0[PieceType::WhiteBishop.piece_index()]
+            .0
+            .count_ones();
+        let num_of_rooks = self.bitboards.0[PieceType::WhiteRook.piece_index()]
+            .0
+            .count_ones();
+        let num_of_queens = self.bitboards.0[PieceType::WhiteQueen.piece_index()]
+            .0
+            .count_ones();
 
-        let num_of_enemy_knights = self.bitboards.0[PieceType::BlackKnight.piece_index()].0.count_ones();
-        let num_of_enemy_pawns = self.bitboards.0[PieceType::BlackPawn.piece_index()].0.count_ones();
-        let num_of_enemy_bishops = self.bitboards.0[PieceType::BlackBishop.piece_index()].0.count_ones();
-        let num_of_enemy_rooks = self.bitboards.0[PieceType::BlackRook.piece_index()].0.count_ones();
-        let num_of_enemy_queens = self.bitboards.0[PieceType::BlackQueen.piece_index()].0.count_ones();
+        let num_of_enemy_knights = self.bitboards.0[PieceType::BlackKnight.piece_index()]
+            .0
+            .count_ones();
+        let num_of_enemy_pawns = self.bitboards.0[PieceType::BlackPawn.piece_index()]
+            .0
+            .count_ones();
+        let num_of_enemy_bishops = self.bitboards.0[PieceType::BlackBishop.piece_index()]
+            .0
+            .count_ones();
+        let num_of_enemy_rooks = self.bitboards.0[PieceType::BlackRook.piece_index()]
+            .0
+            .count_ones();
+        let num_of_enemy_queens = self.bitboards.0[PieceType::BlackQueen.piece_index()]
+            .0
+            .count_ones();
 
         score += (num_of_knights * 3) as i32;
         score += (num_of_pawns * 1) as i32;
@@ -124,16 +144,6 @@ impl Board {
     } //
 
     pub fn evaluate(&mut self) -> i32 {
-        let game_state = self.get_game_state();
-        match game_state {
-            GameState::CheckMate => match self.turn {
-                Turn::WHITE => return i32::MIN,
-                Turn::BLACK => return i32::MAX,
-            },
-            GameState::StaleMate => return 0,
-            _ => (),
-        }
-
         let score = self.pieces_score();
 
         return score;
@@ -216,19 +226,11 @@ impl Board {
         if let Some(score) = tt.get(self.hash, (MAX_DEPTH - depth) as i8) {
             return score;
         }
-        let game_state = self.get_game_state();
-        if game_state == GameState::CheckMate {
-            match self.turn {
-                Turn::WHITE => return i32::MIN + depth,
-                Turn::BLACK => return i32::MAX - depth,
-            }
-        } else if game_state == GameState::StaleMate {
-            return 0;
-        }
 
         if depth >= MAX_DEPTH {
             return self.evaluate();
         }
+
         let mut moves = SmallVec::new();
         self.generate_pesudo_moves(&mut moves);
 
@@ -259,6 +261,17 @@ impl Board {
 
                     if alpha >= beta {
                         break;
+                    }
+                }
+                if best_score == i32::MIN {
+                    //all moves were illegal
+                    if self.is_king_in_check(self.turn) {
+                        match self.turn {
+                            Turn::WHITE => return i32::MIN + depth,
+                            Turn::BLACK => return i32::MAX - depth,
+                        }
+                    } else {
+                        return 0;
                     }
                 }
                 tt.put(self.hash, remaining_depth, best_score);
