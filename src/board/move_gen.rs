@@ -289,7 +289,7 @@ impl Board {
     } //
 
     #[inline(always)]
-    pub fn is_check_by_bishop(&self, king_bb: u64, sliders: u64) -> bool {
+    pub fn is_check_by_bishop_old(&self, king_bb: u64, sliders: u64) -> bool {
         let occ = self.occupied.0;
         let k = king_bb.trailing_zeros() as i32;
 
@@ -353,6 +353,18 @@ impl Board {
 
         // all_locations & sliders != 0
         false
+    } //
+
+    #[inline(always)]
+    pub fn is_check_by_bishop(&self, king_bb: u64, sliders: u64) -> bool {
+        let occupied = self.occupied.0;
+
+        let from = king_bb.trailing_zeros() as u64;
+
+        let attacks_bb = bishop_attacks(from as usize, occupied);
+        let attacks = attacks_bb & sliders;
+
+        return attacks != 0;
     } //
 
     #[inline(always)]
