@@ -76,7 +76,7 @@ impl Board {
             PieceType::BlackQueen,
             PieceType::BlackKing,
         ] {
-            let mut bb = self.bitboards.get(piece);
+            let mut bb = self.bitboards.0[piece.piece_index()].0;
             let p = piece.piece_index();
 
             while bb != 0 {
@@ -96,17 +96,17 @@ impl Board {
     /// The score is turn agnostic , it always returns the score of the white player
     pub fn pieces_score(&self) -> i32 {
         let mut score: i32 = 0;
-        let num_of_knights = (self.bitboards.white_knights.0).count_ones();
-        let num_of_pawns = self.bitboards.white_pawns.0.count_ones();
-        let num_of_bishops = self.bitboards.white_bishops.0.count_ones();
-        let num_of_rooks = self.bitboards.white_rooks.0.count_ones();
-        let num_of_queens = self.bitboards.white_queens.0.count_ones();
+        let num_of_knights = (self.bitboards.0[PieceType::WhiteKnight.piece_index()]).0.count_ones();
+        let num_of_pawns = self.bitboards.0[PieceType::WhitePawn.piece_index()].0.count_ones();
+        let num_of_bishops = self.bitboards.0[PieceType::WhiteBishop.piece_index()].0.count_ones();
+        let num_of_rooks = self.bitboards.0[PieceType::WhiteRook.piece_index()].0.count_ones();
+        let num_of_queens = self.bitboards.0[PieceType::WhiteQueen.piece_index()].0.count_ones();
 
-        let num_of_enemy_knights = self.bitboards.black_knights.0.count_ones();
-        let num_of_enemy_pawns = self.bitboards.black_pawns.0.count_ones();
-        let num_of_enemy_bishops = self.bitboards.black_bishops.0.count_ones();
-        let num_of_enemy_rooks = self.bitboards.black_rooks.0.count_ones();
-        let num_of_enemy_queens = self.bitboards.black_queens.0.count_ones();
+        let num_of_enemy_knights = self.bitboards.0[PieceType::BlackKnight.piece_index()].0.count_ones();
+        let num_of_enemy_pawns = self.bitboards.0[PieceType::BlackPawn.piece_index()].0.count_ones();
+        let num_of_enemy_bishops = self.bitboards.0[PieceType::BlackBishop.piece_index()].0.count_ones();
+        let num_of_enemy_rooks = self.bitboards.0[PieceType::BlackRook.piece_index()].0.count_ones();
+        let num_of_enemy_queens = self.bitboards.0[PieceType::BlackQueen.piece_index()].0.count_ones();
 
         score += (num_of_knights * 3) as i32;
         score += (num_of_pawns * 1) as i32;
@@ -207,6 +207,9 @@ impl Board {
         count: &mut u128,
     ) -> i32 {
         *count += 1;
+        if *count % 1_000_000 == 0 {
+            println!("Nodes searched: {}", count);
+        }
         const MAX_DEPTH: i32 = 9;
         let remaining_depth = (MAX_DEPTH - depth) as i8;
 

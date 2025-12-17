@@ -26,39 +26,43 @@ pub enum Bound {
     Exact,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq , Hash)]
 pub enum PieceType {
-    WhitePawn,
-    WhiteKnight,
-    WhiteBishop,
-    WhiteRook,
-    WhiteQueen,
-    WhiteKing,
-    BlackPawn,
-    BlackKnight,
-    BlackBishop,
-    BlackRook,
-    BlackQueen,
-    BlackKing,
-} //
+    WhitePawn = 0,
+    WhiteKnight = 1,
+    WhiteBishop = 2,
+    WhiteRook = 3,
+    WhiteQueen = 4,
+    WhiteKing = 5,
+    BlackPawn = 6,
+    BlackKnight = 7,
+    BlackBishop = 8,
+    BlackRook = 9,
+    BlackQueen = 10,
+    BlackKing = 11,
+}
 
 impl PieceType {
-    #[inline]
+    // #[inline]
+    // pub fn piece_index(&self) -> usize {
+    //     match self {
+    //         PieceType::WhitePawn => 0,
+    //         PieceType::WhiteKnight => 1,
+    //         PieceType::WhiteBishop => 2,
+    //         PieceType::WhiteRook => 3,
+    //         PieceType::WhiteQueen => 4,
+    //         PieceType::WhiteKing => 5,
+    //         PieceType::BlackPawn => 6,
+    //         PieceType::BlackKnight => 7,
+    //         PieceType::BlackBishop => 8,
+    //         PieceType::BlackRook => 9,
+    //         PieceType::BlackQueen => 10,
+    //         PieceType::BlackKing => 11,
+    //     }
+    // }
+    #[inline(always)]
     pub fn piece_index(&self) -> usize {
-        match self {
-            PieceType::WhitePawn => 0,
-            PieceType::WhiteKnight => 1,
-            PieceType::WhiteBishop => 2,
-            PieceType::WhiteRook => 3,
-            PieceType::WhiteQueen => 4,
-            PieceType::WhiteKing => 5,
-            PieceType::BlackPawn => 6,
-            PieceType::BlackKnight => 7,
-            PieceType::BlackBishop => 8,
-            PieceType::BlackRook => 9,
-            PieceType::BlackQueen => 10,
-            PieceType::BlackKing => 11,
-        }
+        *self as usize
     }
 }
 
@@ -106,15 +110,21 @@ impl Move {
 }
 
 pub struct UnMakeMove {
-    bitboards: BitBoards,
+    from: u8,
+    to: u8,
+    piece: PieceType,
+    captured: Option<PieceType>,
     occupied: BitBoard,
     hash: u64,
 }
 
 impl UnMakeMove {
-    pub fn new(bitboards: BitBoards, occupied: BitBoard, hash: u64) -> UnMakeMove {
+    pub fn new(from: u8 , to:u8 , piece: PieceType, captured: Option<PieceType>, occupied: BitBoard, hash: u64) -> UnMakeMove {
         UnMakeMove {
-            bitboards,
+            from,
+            to,
+            piece,
+            captured,
             occupied,
             hash,
         }
@@ -131,100 +141,116 @@ pub enum Turn {
 } //
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct BitBoards {
-    // white
-    pub white_pawns: BitBoard,
-    pub white_knights: BitBoard,
-    pub white_bishops: BitBoard,
-    pub white_rooks: BitBoard,
-    pub white_queens: BitBoard,
-    pub white_king: BitBoard,
-    //black
-    pub black_pawns: BitBoard,
-    pub black_knights: BitBoard,
-    pub black_bishops: BitBoard,
-    pub black_rooks: BitBoard,
-    pub black_queens: BitBoard,
-    pub black_king: BitBoard,
-} //
+// pub struct BitBoards {
+//     // white
+//     pub white_pawns: BitBoard,
+//     pub white_knights: BitBoard,
+//     pub white_bishops: BitBoard,
+//     pub white_rooks: BitBoard,
+//     pub white_queens: BitBoard,
+//     pub white_king: BitBoard,
+//     //black
+//     pub black_pawns: BitBoard,
+//     pub black_knights: BitBoard,
+//     pub black_bishops: BitBoard,
+//     pub black_rooks: BitBoard,
+//     pub black_queens: BitBoard,
+//     pub black_king: BitBoard,
+// } //
+pub struct BitBoards([BitBoard; 12]);
 
 impl BitBoards {
     pub fn default() -> BitBoards {
-        BitBoards {
-            // white
-            white_pawns: BitBoard(0x000000000000FF00),
-            white_knights: BitBoard(0x0000000000000042),
-            white_bishops: BitBoard(0x0000000000000024),
-            white_rooks: BitBoard(0x0000000000000081),
-            white_queens: BitBoard(0x0000000000000008),
-            white_king: BitBoard(0x0000000000000010),
+        // BitBoards {
+        //     // white
+        //     white_pawns: BitBoard(0x000000000000FF00),
+        //     white_knights: BitBoard(0x0000000000000042),
+        //     white_bishops: BitBoard(0x0000000000000024),
+        //     white_rooks: BitBoard(0x0000000000000081),
+        //     white_queens: BitBoard(0x0000000000000008),
+        //     white_king: BitBoard(0x0000000000000010),
 
-            //black
-            black_pawns: BitBoard(0x00FF000000000000),
-            black_knights: BitBoard(0x4200000000000000),
-            black_bishops: BitBoard(0x2400000000000000),
-            black_rooks: BitBoard(0x8100000000000000),
-            black_queens: BitBoard(0x0800000000000000),
-            black_king: BitBoard(0x1000000000000000),
-        }
+        //     //black
+        //     black_pawns: BitBoard(0x00FF000000000000),
+        //     black_knights: BitBoard(0x4200000000000000),
+        //     black_bishops: BitBoard(0x2400000000000000),
+        //     black_rooks: BitBoard(0x8100000000000000),
+        //     black_queens: BitBoard(0x0800000000000000),
+        //     black_king: BitBoard(0x1000000000000000),
+        // }
+        BitBoards([
+            BitBoard(0x000000000000FF00), // white pawns
+            BitBoard(0x0000000000000042), // white knights
+            BitBoard(0x0000000000000024), // white bishops
+            BitBoard(0x0000000000000081), // white rooks
+            BitBoard(0x0000000000000008), // white queens
+            BitBoard(0x0000000000000010), // white king
+            BitBoard(0x00FF000000000000), // black pawns
+            BitBoard(0x4200000000000000), // black knights
+            BitBoard(0x2400000000000000), // black bishops
+            BitBoard(0x8100000000000000), // black rooks
+            BitBoard(0x0800000000000000), // black queens
+            BitBoard(0x1000000000000000), // black king
+        ])
     } //
 
     pub fn zero() -> BitBoards {
-        BitBoards {
-            // white
-            white_pawns: BitBoard(0),
-            white_knights: BitBoard(0),
-            white_bishops: BitBoard(0),
-            white_rooks: BitBoard(0),
-            white_queens: BitBoard(0),
-            white_king: BitBoard(0),
+        // BitBoards {
+        //     // white
+        //     white_pawns: BitBoard(0),
+        //     white_knights: BitBoard(0),
+        //     white_bishops: BitBoard(0),
+        //     white_rooks: BitBoard(0),
+        //     white_queens: BitBoard(0),
+        //     white_king: BitBoard(0),
 
-            //black
-            black_pawns: BitBoard(0),
-            black_knights: BitBoard(0),
-            black_bishops: BitBoard(0),
-            black_rooks: BitBoard(0),
-            black_queens: BitBoard(0),
-            black_king: BitBoard(0),
-        }
+        //     //black
+        //     black_pawns: BitBoard(0),
+        //     black_knights: BitBoard(0),
+        //     black_bishops: BitBoard(0),
+        //     black_rooks: BitBoard(0),
+        //     black_queens: BitBoard(0),
+        //     black_king: BitBoard(0),
+        // }
+        BitBoards([BitBoard(0); 12])
     } //
 
-    pub fn get_mut(&mut self, piece: PieceType) -> &mut u64 {
-        match piece {
-            PieceType::WhitePawn => &mut self.white_pawns.0,
-            PieceType::WhiteKnight => &mut self.white_knights.0,
-            PieceType::WhiteBishop => &mut self.white_bishops.0,
-            PieceType::WhiteRook => &mut self.white_rooks.0,
-            PieceType::WhiteQueen => &mut self.white_queens.0,
-            PieceType::WhiteKing => &mut self.white_king.0,
+    // pub fn get_mut(&mut self, piece: PieceType) -> &mut u64 {
+    //     match piece {
+    //         PieceType::WhitePawn => &mut self.white_pawns.0,
+    //         PieceType::WhiteKnight => &mut self.white_knights.0,
+    //         PieceType::WhiteBishop => &mut self.white_bishops.0,
+    //         PieceType::WhiteRook => &mut self.white_rooks.0,
+    //         PieceType::WhiteQueen => &mut self.white_queens.0,
+    //         PieceType::WhiteKing => &mut self.white_king.0,
 
-            PieceType::BlackPawn => &mut self.black_pawns.0,
-            PieceType::BlackKnight => &mut self.black_knights.0,
-            PieceType::BlackBishop => &mut self.black_bishops.0,
-            PieceType::BlackRook => &mut self.black_rooks.0,
-            PieceType::BlackQueen => &mut self.black_queens.0,
-            PieceType::BlackKing => &mut self.black_king.0,
-        }
-    } //
+    //         PieceType::BlackPawn => &mut self.black_pawns.0,
+    //         PieceType::BlackKnight => &mut self.black_knights.0,
+    //         PieceType::BlackBishop => &mut self.black_bishops.0,
+    //         PieceType::BlackRook => &mut self.black_rooks.0,
+    //         PieceType::BlackQueen => &mut self.black_queens.0,
+    //         PieceType::BlackKing => &mut self.black_king.0,
+    //     }
+    // } //
 
-    #[inline(always)]
-    pub fn get(&self, piece: PieceType) -> u64 {
-        match piece {
-            PieceType::WhitePawn => self.white_pawns.0,
-            PieceType::WhiteKnight => self.white_knights.0,
-            PieceType::WhiteBishop => self.white_bishops.0,
-            PieceType::WhiteRook => self.white_rooks.0,
-            PieceType::WhiteQueen => self.white_queens.0,
-            PieceType::WhiteKing => self.white_king.0,
+    // #[inline(always)]
+    // pub fn get(&self, piece: PieceType) -> u64 {
+    //     match piece {
+    //         PieceType::WhitePawn => self.white_pawns.0,
+    //         PieceType::WhiteKnight => self.white_knights.0,
+    //         PieceType::WhiteBishop => self.white_bishops.0,
+    //         PieceType::WhiteRook => self.white_rooks.0,
+    //         PieceType::WhiteQueen => self.white_queens.0,
+    //         PieceType::WhiteKing => self.white_king.0,
 
-            PieceType::BlackPawn => self.black_pawns.0,
-            PieceType::BlackKnight => self.black_knights.0,
-            PieceType::BlackBishop => self.black_bishops.0,
-            PieceType::BlackRook => self.black_rooks.0,
-            PieceType::BlackQueen => self.black_queens.0,
-            PieceType::BlackKing => self.black_king.0,
-        }
-    } //
+    //         PieceType::BlackPawn => self.black_pawns.0,
+    //         PieceType::BlackKnight => self.black_knights.0,
+    //         PieceType::BlackBishop => self.black_bishops.0,
+    //         PieceType::BlackRook => self.black_rooks.0,
+    //         PieceType::BlackQueen => self.black_queens.0,
+    //         PieceType::BlackKing => self.black_king.0,
+    //     }
+    // } //
 } //
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]

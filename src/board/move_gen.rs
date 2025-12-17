@@ -29,8 +29,14 @@ impl Board {
         let allay_bits = self.get_allay_pieces().0;
 
         let (mut knights, piece_type) = match self.turn {
-            Turn::WHITE => (self.bitboards.white_knights.0, PieceType::WhiteKnight),
-            Turn::BLACK => (self.bitboards.black_knights.0, PieceType::BlackKnight),
+            Turn::WHITE => (
+                self.bitboards.0[PieceType::WhiteKnight.piece_index()].0,
+                PieceType::WhiteKnight,
+            ),
+            Turn::BLACK => (
+                self.bitboards.0[PieceType::BlackKnight.piece_index()].0,
+                PieceType::BlackKnight,
+            ),
         };
 
         while knights != 0 {
@@ -54,8 +60,14 @@ impl Board {
         let allay_bits = self.get_allay_pieces().0;
 
         let (king, piece_type) = match self.turn {
-            Turn::WHITE => (self.bitboards.white_king.0, PieceType::WhiteKing),
-            Turn::BLACK => (self.bitboards.black_king.0, PieceType::BlackKing),
+            Turn::WHITE => (
+                self.bitboards.0[PieceType::WhiteKing.piece_index()].0,
+                PieceType::WhiteKing,
+            ),
+            Turn::BLACK => (
+                self.bitboards.0[PieceType::BlackKing.piece_index()].0,
+                PieceType::BlackKing,
+            ),
         };
 
         let from = king.trailing_zeros() as u64;
@@ -76,11 +88,11 @@ impl Board {
     #[inline(always)]
     pub fn generate_white_pawns_moves(&self, moves: &mut SmallVec<[Move; 256]>) {
         let blockers = self.occupied.0;
-        // let pawn_squares = &self.bitboards.white_pawns;
+        // let pawn_squares = &self.bitboards.0[PieceType::WhitePawn.piece_index()];
 
         let enemy_pieces_bb = self.get_all_black_bits();
 
-        let mut pawns = self.bitboards.white_pawns.0;
+        let mut pawns = self.bitboards.0[PieceType::WhitePawn.piece_index()].0;
 
         while pawns != 0 {
             let from = pawns.trailing_zeros() as u64;
@@ -122,7 +134,7 @@ impl Board {
         let blockers = self.occupied.0;
         let enemy_pieces_bb = self.get_all_white_bits();
 
-        let mut pawns = self.bitboards.black_pawns.0;
+        let mut pawns = self.bitboards.0[PieceType::BlackPawn.piece_index()].0;
 
         while pawns != 0 {
             let from = pawns.trailing_zeros() as u64;
@@ -165,11 +177,13 @@ impl Board {
 
         let (mut rooks, piece_type) = match self.turn {
             Turn::WHITE => (
-                self.bitboards.white_rooks.0 | self.bitboards.white_queens.0,
+                self.bitboards.0[PieceType::WhiteRook.piece_index()].0
+                    | self.bitboards.0[PieceType::WhiteQueen.piece_index()].0,
                 PieceType::WhiteRook,
             ),
             Turn::BLACK => (
-                self.bitboards.black_rooks.0 | self.bitboards.black_queens.0,
+                self.bitboards.0[PieceType::BlackRook.piece_index()].0
+                    | self.bitboards.0[PieceType::BlackQueen.piece_index()].0,
                 PieceType::BlackRook,
             ),
         };
@@ -180,7 +194,8 @@ impl Board {
 
         while rooks != 0 {
             let from = rooks.trailing_zeros() as u64;
-            let piece_type = if (self.bitboards.white_queens.0 | self.bitboards.black_queens.0)
+            let piece_type = if (self.bitboards.0[PieceType::WhiteQueen.piece_index()].0
+                | self.bitboards.0[PieceType::BlackQueen.piece_index()].0)
                 & 1u64 << from
                 != 0
             {
@@ -272,8 +287,14 @@ impl Board {
         let occupied = self.occupied.0;
 
         let (mut rooks, piece_type) = match self.turn {
-            Turn::WHITE => (self.bitboards.white_rooks.0, PieceType::WhiteRook),
-            Turn::BLACK => (self.bitboards.black_rooks.0, PieceType::BlackRook),
+            Turn::WHITE => (
+                self.bitboards.0[PieceType::WhiteRook.piece_index()].0,
+                PieceType::WhiteRook,
+            ),
+            Turn::BLACK => (
+                self.bitboards.0[PieceType::BlackRook.piece_index()].0,
+                PieceType::BlackRook,
+            ),
         };
 
         while rooks != 0 {
@@ -292,8 +313,14 @@ impl Board {
         }
 
         let (mut queens, piece_type) = match self.turn {
-            Turn::WHITE => (self.bitboards.white_queens.0, PieceType::WhiteQueen),
-            Turn::BLACK => (self.bitboards.black_queens.0, PieceType::BlackQueen),
+            Turn::WHITE => (
+                self.bitboards.0[PieceType::WhiteQueen.piece_index()].0,
+                PieceType::WhiteQueen,
+            ),
+            Turn::BLACK => (
+                self.bitboards.0[PieceType::BlackQueen.piece_index()].0,
+                PieceType::BlackQueen,
+            ),
         };
 
         while queens != 0 {
@@ -320,11 +347,13 @@ impl Board {
 
         let (mut bishops, piece_type) = match self.turn {
             Turn::WHITE => (
-                self.bitboards.white_bishops.0 | self.bitboards.white_queens.0,
+                self.bitboards.0[PieceType::WhiteBishop.piece_index()].0
+                    | self.bitboards.0[PieceType::WhiteQueen.piece_index()].0,
                 PieceType::WhiteBishop,
             ),
             Turn::BLACK => (
-                self.bitboards.black_bishops.0 | self.bitboards.black_queens.0,
+                self.bitboards.0[PieceType::BlackBishop.piece_index()].0
+                    | self.bitboards.0[PieceType::BlackQueen.piece_index()].0,
                 PieceType::BlackBishop,
             ),
         };
@@ -335,7 +364,8 @@ impl Board {
 
         while bishops != 0 {
             let from = bishops.trailing_zeros() as u64;
-            let piece_type = if (self.bitboards.white_queens.0 | self.bitboards.black_queens.0)
+            let piece_type = if (self.bitboards.0[PieceType::WhiteQueen.piece_index()].0
+                | self.bitboards.0[PieceType::BlackQueen.piece_index()].0)
                 & 1u64 << from
                 != 0
             {
@@ -432,8 +462,14 @@ impl Board {
         let all_bits = self.occupied.0;
 
         let (mut bishops, piece_type) = match self.turn {
-            Turn::WHITE => (self.bitboards.white_bishops.0, PieceType::WhiteBishop),
-            Turn::BLACK => (self.bitboards.black_bishops.0, PieceType::BlackBishop),
+            Turn::WHITE => (
+                self.bitboards.0[PieceType::WhiteBishop.piece_index()].0,
+                PieceType::WhiteBishop,
+            ),
+            Turn::BLACK => (
+                self.bitboards.0[PieceType::BlackBishop.piece_index()].0,
+                PieceType::BlackBishop,
+            ),
         };
 
         while bishops != 0 {
@@ -452,8 +488,14 @@ impl Board {
         }
 
         let (mut queens, piece_type) = match self.turn {
-            Turn::WHITE => (self.bitboards.white_queens.0, PieceType::WhiteQueen),
-            Turn::BLACK => (self.bitboards.black_queens.0, PieceType::BlackQueen),
+            Turn::WHITE => (
+                self.bitboards.0[PieceType::WhiteQueen.piece_index()].0,
+                PieceType::WhiteQueen,
+            ),
+            Turn::BLACK => (
+                self.bitboards.0[PieceType::BlackQueen.piece_index()].0,
+                PieceType::BlackQueen,
+            ),
         };
 
         while queens != 0 {
@@ -479,8 +521,14 @@ impl Board {
         let occupied = self.occupied.0;
 
         let (mut queen_bits, piece_type) = match self.turn {
-            Turn::WHITE => (self.bitboards.white_queens.0, PieceType::WhiteQueen),
-            Turn::BLACK => (self.bitboards.black_queens.0, PieceType::BlackQueen),
+            Turn::WHITE => (
+                self.bitboards.0[PieceType::WhiteQueen.piece_index()].0,
+                PieceType::WhiteQueen,
+            ),
+            Turn::BLACK => (
+                self.bitboards.0[PieceType::BlackQueen.piece_index()].0,
+                PieceType::BlackQueen,
+            ),
         };
 
         let mut add = |from: u64, to: u64, capture: bool| {
@@ -857,8 +905,8 @@ impl Board {
         self.generate_pesudo_moves(&mut pesudo_moves);
 
         let king_bb = match self.turn {
-            Turn::WHITE => self.bitboards.white_king.0,
-            Turn::BLACK => self.bitboards.black_king.0,
+            Turn::WHITE => self.bitboards.0[PieceType::WhiteKing.piece_index()].0,
+            Turn::BLACK => self.bitboards.0[PieceType::BlackKing.piece_index()].0,
         };
 
         let king_type = match self.turn {
@@ -906,8 +954,14 @@ impl Board {
 
     pub fn is_king_in_check(&self, turn: Turn) -> bool {
         let (king, enemy_king) = match turn {
-            Turn::BLACK => (&self.bitboards.black_king.0, &self.bitboards.white_king.0),
-            Turn::WHITE => (&self.bitboards.white_king.0, &self.bitboards.black_king.0),
+            Turn::BLACK => (
+                &self.bitboards.0[PieceType::BlackKing.piece_index()].0,
+                &self.bitboards.0[PieceType::WhiteKing.piece_index()].0,
+            ),
+            Turn::WHITE => (
+                &self.bitboards.0[PieceType::WhiteKing.piece_index()].0,
+                &self.bitboards.0[PieceType::BlackKing.piece_index()].0,
+            ),
         };
 
         if king.trailing_zeros() > 63 {
@@ -917,24 +971,24 @@ impl Board {
         let king_square = king.trailing_zeros() as u64;
 
         let enemy_rooks = match turn {
-            Turn::BLACK => &self.bitboards.white_rooks.0,
-            Turn::WHITE => &self.bitboards.black_rooks.0,
+            Turn::BLACK => &self.bitboards.0[PieceType::WhiteRook.piece_index()].0,
+            Turn::WHITE => &self.bitboards.0[PieceType::BlackRook.piece_index()].0,
         };
         let enemy_queens = match turn {
-            Turn::BLACK => &self.bitboards.white_queens.0,
-            Turn::WHITE => &self.bitboards.black_queens.0,
+            Turn::BLACK => &self.bitboards.0[PieceType::WhiteQueen.piece_index()].0,
+            Turn::WHITE => &self.bitboards.0[PieceType::BlackQueen.piece_index()].0,
         };
         let enemy_bishops = match turn {
-            Turn::BLACK => &self.bitboards.white_bishops.0,
-            Turn::WHITE => &self.bitboards.black_bishops.0,
+            Turn::BLACK => &self.bitboards.0[PieceType::WhiteBishop.piece_index()].0,
+            Turn::WHITE => &self.bitboards.0[PieceType::BlackBishop.piece_index()].0,
         };
         let enemy_knights = match turn {
-            Turn::BLACK => &self.bitboards.white_knights.0,
-            Turn::WHITE => &self.bitboards.black_knights.0,
+            Turn::BLACK => &self.bitboards.0[PieceType::WhiteKnight.piece_index()].0,
+            Turn::WHITE => &self.bitboards.0[PieceType::BlackKnight.piece_index()].0,
         };
         let enemy_pawns = match turn {
-            Turn::BLACK => &self.bitboards.white_pawns.0,
-            Turn::WHITE => &self.bitboards.black_pawns.0,
+            Turn::BLACK => &self.bitboards.0[PieceType::WhitePawn.piece_index()].0,
+            Turn::WHITE => &self.bitboards.0[PieceType::BlackPawn.piece_index()].0,
         };
         let is_attacked_by_knights =
             (KNIGHTS_ATTACK_TABLE[king_square as usize] & enemy_knights) != 0;
@@ -981,60 +1035,95 @@ impl Board {
         return false;
     } //
 
-    #[inline(always)]
     pub fn make_move(&mut self, mv: Move) -> UnMakeMove {
+        let from = mv.from() as u8;
+        let to = mv.to() as u8;
+
+        let captured = self.piece_at[to as usize];
+
+        let undo = UnMakeMove {
+            from,
+            to,
+            piece: mv.piece(),
+            captured,
+            hash: self.hash,
+            occupied: self.occupied,
+        };
+
+        if let Some(p) = captured {
+            self.remove_piece(p, to);
+        }
+
+        self.remove_piece(mv.piece(), from);
+        self.add_piece(mv.piece(), to);
+
+        self.switch_turn();
+        self.hash ^= *Z_SIDE;
+
+        undo
+    }
+
+    #[inline(always)]
+    pub fn make_move_old(&mut self, mv: Move) -> UnMakeMove {
         let from = mv.from() as usize;
         let to = mv.to() as usize;
 
         let occupied = self.occupied.0;
 
         // The Object Needed to unmake the move
-        let unmake_move = UnMakeMove::new(self.bitboards, self.occupied, self.hash);
+        let unmake_move =
+            UnMakeMove::new(from as u8, to as u8, mv.piece(), self.piece_at[to],  self.occupied, self.hash);
 
         // =========================
         // 1. Zobrist: remove captured piece
         // =========================
-        if occupied & (1u64 << to) != 0 {
-            let to_mask = 1u64 << to;
+        // if occupied & (1u64 << to) != 0 {
+        //     let to_mask = 1u64 << to;
 
-            if self.bitboards.white_pawns.0 & to_mask != 0 {
-                self.bitboards.white_pawns.0 &= !to_mask;
-                self.hash ^= Z_PIECE[PieceType::WhitePawn.piece_index()][to];
-            } else if self.bitboards.white_bishops.0 & to_mask != 0 {
-                self.bitboards.white_bishops.0 &= !to_mask;
-                self.hash ^= Z_PIECE[PieceType::WhiteBishop.piece_index()][to];
-            } else if self.bitboards.white_knights.0 & to_mask != 0 {
-                self.bitboards.white_knights.0 &= !to_mask;
-                self.hash ^= Z_PIECE[PieceType::WhiteKnight.piece_index()][to];
-            } else if self.bitboards.white_rooks.0 & to_mask != 0 {
-                self.bitboards.white_rooks.0 &= !to_mask;
-                self.hash ^= Z_PIECE[PieceType::WhiteRook.piece_index()][to];
-            } else if self.bitboards.white_queens.0 & to_mask != 0 {
-                self.bitboards.white_queens.0 &= !to_mask;
-                self.hash ^= Z_PIECE[PieceType::WhiteQueen.piece_index()][to];
-            } else if self.bitboards.white_king.0 & to_mask != 0 {
-                self.bitboards.white_king.0 &= !to_mask;
-                self.hash ^= Z_PIECE[PieceType::WhiteKing.piece_index()][to];
-            } else if self.bitboards.black_pawns.0 & to_mask != 0 {
-                self.bitboards.black_pawns.0 &= !to_mask;
-                self.hash ^= Z_PIECE[PieceType::BlackPawn.piece_index()][to];
-            } else if self.bitboards.black_knights.0 & to_mask != 0 {
-                self.bitboards.black_knights.0 &= !to_mask;
-                self.hash ^= Z_PIECE[PieceType::BlackKnight.piece_index()][to];
-            } else if self.bitboards.black_bishops.0 & to_mask != 0 {
-                self.bitboards.black_bishops.0 &= !to_mask;
-                self.hash ^= Z_PIECE[PieceType::BlackBishop.piece_index()][to];
-            } else if self.bitboards.black_rooks.0 & to_mask != 0 {
-                self.bitboards.black_rooks.0 &= !to_mask;
-                self.hash ^= Z_PIECE[PieceType::BlackRook.piece_index()][to];
-            } else if self.bitboards.black_queens.0 & to_mask != 0 {
-                self.bitboards.black_queens.0 &= !to_mask;
-                self.hash ^= Z_PIECE[PieceType::BlackQueen.piece_index()][to];
-            } else if self.bitboards.black_king.0 & to_mask != 0 {
-                self.bitboards.black_king.0 &= !to_mask;
-                self.hash ^= Z_PIECE[PieceType::BlackKing.piece_index()][to];
-            }
-        };
+        //     if self.bitboards.0[PieceType::WhitePawn.piece_index()].0 & to_mask != 0 {
+        //         self.bitboards.0[PieceType::WhitePawn.piece_index()].0 &= !to_mask;
+        //         self.hash ^= Z_PIECE[PieceType::WhitePawn.piece_index()][to];
+        //     } else if self.bitboards.0[PieceType::WhiteBishop.piece_index()].0 & to_mask != 0 {
+        //         self.bitboards.0[PieceType::WhiteBishop.piece_index()].0 &= !to_mask;
+        //         self.hash ^= Z_PIECE[PieceType::WhiteBishop.piece_index()][to];
+        //     } else if self.bitboards.0[PieceType::WhiteKnight.piece_index()].0 & to_mask != 0 {
+        //         self.bitboards.0[PieceType::WhiteKnight.piece_index()].0 &= !to_mask;
+        //         self.hash ^= Z_PIECE[PieceType::WhiteKnight.piece_index()][to];
+        //     } else if self.bitboards.0[PieceType::WhiteRook.piece_index()].0 & to_mask != 0 {
+        //         self.bitboards.0[PieceType::WhiteRook.piece_index()].0 &= !to_mask;
+        //         self.hash ^= Z_PIECE[PieceType::WhiteRook.piece_index()][to];
+        //     } else if self.bitboards.0[PieceType::WhiteQueen.piece_index()].0 & to_mask != 0 {
+        //         self.bitboards.0[PieceType::WhiteQueen.piece_index()].0 &= !to_mask;
+        //         self.hash ^= Z_PIECE[PieceType::WhiteQueen.piece_index()][to];
+        //     } else if self.bitboards.0[PieceType::WhiteKing.piece_index()].0 & to_mask != 0 {
+        //         self.bitboards.0[PieceType::WhiteKing.piece_index()].0 &= !to_mask;
+        //         self.hash ^= Z_PIECE[PieceType::WhiteKing.piece_index()][to];
+        //     } else if self.bitboards.0[PieceType::BlackPawn.piece_index()].0 & to_mask != 0 {
+        //         self.bitboards.0[PieceType::BlackPawn.piece_index()].0 &= !to_mask;
+        //         self.hash ^= Z_PIECE[PieceType::BlackPawn.piece_index()][to];
+        //     } else if self.bitboards.0[PieceType::BlackKnight.piece_index()].0 & to_mask != 0 {
+        //         self.bitboards.0[PieceType::BlackKnight.piece_index()].0 &= !to_mask;
+        //         self.hash ^= Z_PIECE[PieceType::BlackKnight.piece_index()][to];
+        //     } else if self.bitboards.0[PieceType::BlackBishop.piece_index()].0 & to_mask != 0 {
+        //         self.bitboards.0[PieceType::BlackBishop.piece_index()].0 &= !to_mask;
+        //         self.hash ^= Z_PIECE[PieceType::BlackBishop.piece_index()][to];
+        //     } else if self.bitboards.0[PieceType::BlackRook.piece_index()].0 & to_mask != 0 {
+        //         self.bitboards.0[PieceType::BlackRook.piece_index()].0 &= !to_mask;
+        //         self.hash ^= Z_PIECE[PieceType::BlackRook.piece_index()][to];
+        //     } else if self.bitboards.0[PieceType::BlackQueen.piece_index()].0 & to_mask != 0 {
+        //         self.bitboards.0[PieceType::BlackQueen.piece_index()].0 &= !to_mask;
+        //         self.hash ^= Z_PIECE[PieceType::BlackQueen.piece_index()][to];
+        //     } else if self.bitboards.0[PieceType::BlackKing.piece_index()].0 & to_mask != 0 {
+        //         self.bitboards.0[PieceType::BlackKing.piece_index()].0 &= !to_mask;
+        //         self.hash ^= Z_PIECE[PieceType::BlackKing.piece_index()][to];
+        //     }
+        // };
+
+        let captured = self.piece_at[to];
+
+        if let Some(p) = captured {
+            self.remove_piece(p, to as u8);
+        }
 
         // =========================
         // 2. Move piece (bitboards)
@@ -1042,56 +1131,59 @@ impl Board {
         let from_mask = 1u64 << from;
         let to_mask = 1u64 << to;
 
-        match mv.piece() {
-            PieceType::WhitePawn => {
-                self.bitboards.white_pawns.0 &= !from_mask;
-                self.bitboards.white_pawns.0 |= to_mask;
-            }
-            PieceType::WhiteKnight => {
-                self.bitboards.white_knights.0 &= !from_mask;
-                self.bitboards.white_knights.0 |= to_mask;
-            }
-            PieceType::WhiteBishop => {
-                self.bitboards.white_bishops.0 &= !from_mask;
-                self.bitboards.white_bishops.0 |= to_mask;
-            }
-            PieceType::WhiteRook => {
-                self.bitboards.white_rooks.0 &= !from_mask;
-                self.bitboards.white_rooks.0 |= to_mask;
-            }
-            PieceType::WhiteQueen => {
-                self.bitboards.white_queens.0 &= !from_mask;
-                self.bitboards.white_queens.0 |= to_mask;
-            }
-            PieceType::WhiteKing => {
-                self.bitboards.white_king.0 &= !from_mask;
-                self.bitboards.white_king.0 |= to_mask;
-            }
-            PieceType::BlackPawn => {
-                self.bitboards.black_pawns.0 &= !from_mask;
-                self.bitboards.black_pawns.0 |= to_mask;
-            }
-            PieceType::BlackKnight => {
-                self.bitboards.black_knights.0 &= !from_mask;
-                self.bitboards.black_knights.0 |= to_mask;
-            }
-            PieceType::BlackBishop => {
-                self.bitboards.black_bishops.0 &= !from_mask;
-                self.bitboards.black_bishops.0 |= to_mask;
-            }
-            PieceType::BlackRook => {
-                self.bitboards.black_rooks.0 &= !from_mask;
-                self.bitboards.black_rooks.0 |= to_mask;
-            }
-            PieceType::BlackQueen => {
-                self.bitboards.black_queens.0 &= !from_mask;
-                self.bitboards.black_queens.0 |= to_mask;
-            }
-            PieceType::BlackKing => {
-                self.bitboards.black_king.0 &= !from_mask;
-                self.bitboards.black_king.0 |= to_mask;
-            }
-        };
+        self.remove_piece(mv.piece(), from as u8);
+        self.add_piece(mv.piece(), to as u8);
+
+        // match mv.piece() {
+        //     PieceType::WhitePawn => {
+        //         self.bitboards.0[PieceType::WhitePawn.piece_index()].0 &= !from_mask;
+        //         self.bitboards.0[PieceType::WhitePawn.piece_index()].0 |= to_mask;
+        //     }
+        //     PieceType::WhiteKnight => {
+        //         self.bitboards.0[PieceType::WhiteKnight.piece_index()].0 &= !from_mask;
+        //         self.bitboards.0[PieceType::WhiteKnight.piece_index()].0 |= to_mask;
+        //     }
+        //     PieceType::WhiteBishop => {
+        //         self.bitboards.0[PieceType::WhiteBishop.piece_index()].0 &= !from_mask;
+        //         self.bitboards.0[PieceType::WhiteBishop.piece_index()].0 |= to_mask;
+        //     }
+        //     PieceType::WhiteRook => {
+        //         self.bitboards.0[PieceType::WhiteRook.piece_index()].0 &= !from_mask;
+        //         self.bitboards.0[PieceType::WhiteRook.piece_index()].0 |= to_mask;
+        //     }
+        //     PieceType::WhiteQueen => {
+        //         self.bitboards.0[PieceType::WhiteQueen.piece_index()].0 &= !from_mask;
+        //         self.bitboards.0[PieceType::WhiteQueen.piece_index()].0 |= to_mask;
+        //     }
+        //     PieceType::WhiteKing => {
+        //         self.bitboards.0[PieceType::WhiteKing.piece_index()].0 &= !from_mask;
+        //         self.bitboards.0[PieceType::WhiteKing.piece_index()].0 |= to_mask;
+        //     }
+        //     PieceType::BlackPawn => {
+        //         self.bitboards.0[PieceType::BlackPawn.piece_index()].0 &= !from_mask;
+        //         self.bitboards.0[PieceType::BlackPawn.piece_index()].0 |= to_mask;
+        //     }
+        //     PieceType::BlackKnight => {
+        //         self.bitboards.0[PieceType::BlackKnight.piece_index()].0 &= !from_mask;
+        //         self.bitboards.0[PieceType::BlackKnight.piece_index()].0 |= to_mask;
+        //     }
+        //     PieceType::BlackBishop => {
+        //         self.bitboards.0[PieceType::BlackBishop.piece_index()].0 &= !from_mask;
+        //         self.bitboards.0[PieceType::BlackBishop.piece_index()].0 |= to_mask;
+        //     }
+        //     PieceType::BlackRook => {
+        //         self.bitboards.0[PieceType::BlackRook.piece_index()].0 &= !from_mask;
+        //         self.bitboards.0[PieceType::BlackRook.piece_index()].0 |= to_mask;
+        //     }
+        //     PieceType::BlackQueen => {
+        //         self.bitboards.0[PieceType::BlackQueen.piece_index()].0 &= !from_mask;
+        //         self.bitboards.0[PieceType::BlackQueen.piece_index()].0 |= to_mask;
+        //     }
+        //     PieceType::BlackKing => {
+        //         self.bitboards.0[PieceType::BlackKing.piece_index()].0 &= !from_mask;
+        //         self.bitboards.0[PieceType::BlackKing.piece_index()].0 |= to_mask;
+        //     }
+        // };
 
         // =========================
         // 3. Zobrist: move piece
@@ -1112,6 +1204,9 @@ impl Board {
         self.switch_turn();
         self.hash ^= *Z_SIDE;
 
+        self.piece_at[from] = None;
+        self.piece_at[to] = Some(mv.piece());
+
         // let computed = self.compute_hash();
         // if computed != self.hash {
         //     let diff = computed ^ self.hash;
@@ -1125,7 +1220,14 @@ impl Board {
     } //
 
     pub fn unmake_move(&mut self, unmake_move: UnMakeMove) {
-        self.bitboards = unmake_move.bitboards;
+        // self.bitboards = unmake_move.bitboards;
+        self.remove_piece(unmake_move.piece, unmake_move.to);
+        self.add_piece(unmake_move.piece, unmake_move.from);
+
+        if let Some(piece) = self.piece_at[unmake_move.to as usize] {
+            self.remove_piece(piece, unmake_move.to);
+        }
+
         self.switch_turn();
         self.hash = unmake_move.hash;
         self.occupied = unmake_move.occupied;
