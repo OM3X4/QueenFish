@@ -218,7 +218,7 @@ impl Board {
     ) -> i32 {
         *count += 1;
         if *count % 1_000_000 == 0 {
-            println!("Nodes searched: {}", count);
+            dbg!(*count);
         }
         const MAX_DEPTH: i32 = 8;
         let remaining_depth = (MAX_DEPTH - depth) as i8;
@@ -273,7 +273,7 @@ impl Board {
                     } else {
                         return 0;
                     }
-                }
+                };
                 tt.put(self.hash, remaining_depth, best_score);
                 return best_score;
             } //
@@ -299,7 +299,18 @@ impl Board {
                     if alpha >= beta {
                         break;
                     }
-                }
+                };
+                if best_score == i32::MIN {
+                    //all moves were illegal
+                    if self.is_king_in_check(self.turn) {
+                        match self.turn {
+                            Turn::WHITE => return i32::MIN + depth,
+                            Turn::BLACK => return i32::MAX - depth,
+                        }
+                    } else {
+                        return 0;
+                    }
+                };
                 tt.put(self.hash, remaining_depth, best_score);
                 return best_score;
             } //
@@ -307,7 +318,6 @@ impl Board {
     } //
 
     pub fn engine(&mut self) -> Move {
-
         let mut moves = self.generate_moves();
         partition_by_bool(&mut moves, |mv| mv.is_capture());
 
@@ -332,7 +342,6 @@ impl Board {
 
             self.unmake_move(unmake_move);
         }
-        dbg!(count);
         return best_move;
     }
 }
@@ -349,12 +358,23 @@ mod test {
     #[test]
     fn generate_move() {
         use super::Board;
+        use crate::board::rook_magic::init_rook_magics;
+        use crate::board::bishop_magic::init_bishop_magics;
+
+        init_bishop_magics();
+        init_rook_magics();
 
         let mut board = Board::new();
         board.load_from_fen("8/7n/3r1B1P/4Nk2/b7/5QB1/pKN1q1Pb/8 b");
 
         let best_move = board.engine();
 
+        println!("{:?}", best_move.to_uci());
         println!("{:?} {:?}", best_move.from(), best_move.to());
+
+        // let moves = board.generate_moves();
+        // for mv in moves {
+        //     println!("{:?} {:?} {:?}", mv.to_uci() ,mv.from(), mv.to());
+        // }
     }
 }

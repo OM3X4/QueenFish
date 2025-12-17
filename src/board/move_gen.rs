@@ -7,7 +7,7 @@ use super::constants::{
     BLACK_PAWN_ATTACKS, KING_ATTACK_TABLE, KNIGHTS_ATTACK_TABLE, SQUARE_RAYS, WHITE_PAWN_ATTACKS,
 };
 use super::constants::{FILE_A, FILE_H, RANK_2, RANK_7};
-use super::zobrist::{Z_SIDE};
+use super::zobrist::Z_SIDE;
 use super::{Board, Move, PieceType, Turn};
 
 pub fn extract_bits(bitboard: u64) -> Vec<u64> {
@@ -147,14 +147,14 @@ impl Board {
                 moves.push(Move::new(
                     from as u8,
                     (from - 8) as u8,
-                    PieceType::WhitePawn,
+                    PieceType::BlackPawn,
                     false,
                 ));
                 if (((1u64 << from) & RANK_7) != 0) && (blockers & (1u64 << (from - 16))) == 0 {
                     moves.push(Move::new(
                         from as u8,
                         (from - 16) as u8,
-                        PieceType::WhitePawn,
+                        PieceType::BlackPawn,
                         false,
                     ));
                 }
@@ -165,7 +165,7 @@ impl Board {
             while attacks != 0 {
                 let to = attacks.trailing_zeros() as u64;
                 attacks &= attacks - 1;
-                moves.push(Move::new(from as u8, to as u8, PieceType::WhitePawn, true));
+                moves.push(Move::new(from as u8, to as u8, PieceType::BlackPawn, true));
             }
         }
     } //
@@ -410,6 +410,7 @@ impl Board {
         };
 
         let is_king_in_check_now = self.is_king_in_check(self.turn);
+
         let king_square = king_bb.trailing_zeros() as usize;
 
         if king_square > 63 {
@@ -433,16 +434,15 @@ impl Board {
                 }
             }
             let unmake_move = self.make_move(mv);
-            self.switch_turn();
 
-            let is_illegal = self.is_king_in_check(self.turn);
+            let is_illegal = self.is_king_in_check(self.opposite_turn());
+
 
             if !is_illegal {
                 legal_moves.push(mv);
             }
 
             self.unmake_move(unmake_move);
-            self.switch_turn();
         }
         return legal_moves;
     } //
@@ -514,12 +514,17 @@ impl Board {
 
         match turn {
             Turn::BLACK => {
+                // Use BLACK_PAWN_ATTACKS to look "down" (South) towards where
+                // White pawns would be attacking from.
                 let mask = BLACK_PAWN_ATTACKS[king_square as usize];
+
                 if enemy_pawns & mask != 0 {
                     return true;
                 }
             }
             Turn::WHITE => {
+                // Use WHITE_PAWN_ATTACKS to look "up" (North) towards where
+                // Black pawns would be attacking from.
                 let mask = WHITE_PAWN_ATTACKS[king_square as usize];
                 if enemy_pawns & mask != 0 {
                     return true;
@@ -556,23 +561,22 @@ impl Board {
         self.hash ^= *Z_SIDE;
 
         undo
-    }//
+    } //
 
     pub fn unmake_move(&mut self, unmake_move: UnMakeMove) {
         // self.bitboards = unmake_move.bitboards;
         self.remove_piece(unmake_move.piece, unmake_move.to);
         self.add_piece(unmake_move.piece, unmake_move.from);
 
-        if let Some(piece) = self.piece_at[unmake_move.to as usize] {
-            self.remove_piece(piece, unmake_move.to);
+        if let Some(piece) = unmake_move.captured {
+            self.add_piece(piece, unmake_move.to);
         }
 
         self.switch_turn();
         self.hash = unmake_move.hash;
         self.occupied = unmake_move.occupied;
     } //
-
-}//
+} //
 
 #[cfg(test)]
 mod test {
@@ -584,20 +588,16 @@ mod test {
         board.load_from_fen("1rbk1bnr/pp3ppp/1Pp1p3/3p1P2/5N1q/2NQ2P1/1PP1P2P/R1B1KB1R w");
         // board.load_from_fen("1rbk1bnr/pp3ppp/1Pp1p3/3Q1P2/5N1q/2N3P1/1PP1P2P/R1B1KB1R w");
 
-        dbg!(board.is_king_in_check(Turn::WHITE));
-
         let moves = board.generate_moves();
         for mv in moves {
             // println!("{:?} , {:?}", mv.from , mv.to);
         }
     } //
 
-
     #[test]
     fn test_rook_magic() {
         let mut board = Board::new();
         board.load_from_fen("1rbk1bnr/pp3ppp/1Pp1p3/3p1P2/5N1q/2NQ2P1/1PP1P2P/R1B1KB1R w");
         let attacks = rook_attacks(0, board.occupied.0);
-        dbg!(extract_bits(attacks));
     }
 }

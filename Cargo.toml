@@ -31,3 +31,7 @@ path = "src/bin/py_api.rs"
 name = "magics"
 path = "src/bin/test_magics.rs"
 
+[[bin]]
+name = "test_best_move"
+path = "src/bin/test_best_move.rs"
+

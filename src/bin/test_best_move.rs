@@ -12,12 +12,12 @@ fn main() {
     let mut board = Board::new();
 
     board.load_from_fen(fen.trim());
+    // board.load_from_fen("8/7n/3r1B1P/4Nk2/b7/5QB1/pKN1q1Pb/8 b");
 
     // println!("{}", board.to_fen());
 
-    let moves = board.generate_moves();
+    // dbg!(board.turn);
+    let best_move = board.engine();
 
-    for m in moves {
-        println!("{} {}", m.from(), m.to());
-    }
+    println!("{:?} {:?}", best_move.from() , best_move.to());
 }

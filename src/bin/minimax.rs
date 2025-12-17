@@ -9,8 +9,8 @@ fn main() {
     let start = std::time::Instant::now();
 
     let mut board = Board::new();
-    board.load_from_fen("8/7n/3r1B1P/4Nk2/b7/5QB1/pKN1q1Pb/8 b");
-    board.engine();
+    board.load_from_fen("5b2/3k1b2/7p/1n1PR3/2p3q1/5Q1R/2pr1N1K/7N w");
+    let best_move = board.engine();
     // for _ in 0..20_000_000 {
     //     // let mut moves: Vec<Move> = Vec::with_capacity(256);
     //     let mut moves: SmallVec<[Move; 256]> = SmallVec::new();
@@ -19,4 +19,5 @@ fn main() {
     let end = std::time::Instant::now();
     let duration = end.duration_since(start);
     println!("Time took: {:?} seconds", duration.as_secs_f64(),);
+    println!("{:?}", best_move.to_uci());
 }

@@ -1,11 +1,10 @@
+pub mod bishop_magic;
 pub mod board;
 mod constants;
 mod engine;
 pub mod move_gen;
 pub mod rook_magic;
-pub mod bishop_magic;
 mod zobrist;
-
 
 pub use board::Board;
 
@@ -26,7 +25,7 @@ pub enum Bound {
     Exact,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq , Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum PieceType {
     WhitePawn = 0,
     WhiteKnight = 1,
@@ -82,6 +81,25 @@ impl Move {
     pub fn is_capture(self) -> bool {
         ((self.0 >> 16) & 1) != 0
     }
+    #[inline(always)]
+    pub fn to_uci(self) -> String {
+        let from = self.from();
+        let to = self.to();
+
+        let file_from = (from & 7) as u8;
+        let rank_from = (from >> 3) as u8;
+
+        let file_to = (to & 7) as u8;
+        let rank_to = (to >> 3) as u8;
+
+        let mut s = String::with_capacity(4);
+        s.push((b'a' + file_from) as char);
+        s.push((b'1' + rank_from) as char);
+        s.push((b'a' + file_to) as char);
+        s.push((b'1' + rank_to) as char);
+
+        s
+    }
 }
 
 pub struct UnMakeMove {
@@ -94,7 +112,14 @@ pub struct UnMakeMove {
 }
 
 impl UnMakeMove {
-    pub fn new(from: u8 , to:u8 , piece: PieceType, captured: Option<PieceType>, occupied: BitBoard, hash: u64) -> UnMakeMove {
+    pub fn new(
+        from: u8,
+        to: u8,
+        piece: PieceType,
+        captured: Option<PieceType>,
+        occupied: BitBoard,
+        hash: u64,
+    ) -> UnMakeMove {
         UnMakeMove {
             from,
             to,
