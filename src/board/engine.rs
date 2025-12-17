@@ -1,5 +1,7 @@
 use smallvec::SmallVec;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 use super::zobrist::{Z_PIECE, Z_SIDE};
 use super::{Board, GameState, Move, PieceType, TTEntry, TranspositionTable, Turn};
@@ -217,10 +219,10 @@ impl Board {
         count: &mut u128,
     ) -> i32 {
         *count += 1;
-        if *count % 1_000_000 == 0 {
-            dbg!(*count);
-        }
-        const MAX_DEPTH: i32 = 8;
+        // if *count % 1_000_000 == 0 {
+        //     dbg!(*count);
+        // }
+        const MAX_DEPTH: i32 = 9;
         let remaining_depth = (MAX_DEPTH - depth) as i8;
 
         if let Some(score) = tt.get(self.hash, (MAX_DEPTH - depth) as i8) {
@@ -299,7 +301,7 @@ impl Board {
                     if alpha >= beta {
                         break;
                     }
-                };
+                }
                 if best_score == i32::MIN {
                     //all moves were illegal
                     if self.is_king_in_check(self.turn) {
@@ -344,6 +346,55 @@ impl Board {
         }
         return best_move;
     }
+
+    pub fn engine_multithreaded(&mut self) -> Move {
+        let mut moves = self.generate_moves();
+        partition_by_bool(&mut moves, |mv| mv.is_capture());
+
+        let best = Arc::new(Mutex::new((i32::MIN, moves[0])));
+
+        let threads = 16;
+        let chunk_size = (moves.len() + threads - 1) / threads;
+
+        let mut handles = Vec::new();
+
+        let mut count = 0;
+        for chunck in moves.chunks(chunk_size) {
+            let mut board = self.clone();
+            let best = Arc::clone(&best);
+            let mut chunck = chunck.to_vec();
+            partition_by_bool(&mut chunck , |mv| mv.is_capture());
+
+
+            handles.push(thread::spawn(move || {
+                let mut tt = TranspositionTable::new(20);
+
+                for mv in chunck {
+                    let unmake_move = board.make_move(mv);
+
+                    let mut score = board.alpha_beta(0, i32::MIN, i32::MAX, &mut tt, &mut count);
+
+                    if board.turn == Turn::WHITE {
+                        score = -score;
+                    }
+
+                    let mut best = best.lock().unwrap();
+                    if score > best.0 {
+                        *best = (score, mv);
+                    }
+
+                    board.unmake_move(unmake_move);
+                }
+            }));
+
+        };
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        return best.lock().unwrap().1.clone();
+    } //
 }
 
 mod test {
@@ -358,8 +409,8 @@ mod test {
     #[test]
     fn generate_move() {
         use super::Board;
-        use crate::board::rook_magic::init_rook_magics;
         use crate::board::bishop_magic::init_bishop_magics;
+        use crate::board::rook_magic::init_rook_magics;
 
         init_bishop_magics();
         init_rook_magics();
@@ -367,7 +418,7 @@ mod test {
         let mut board = Board::new();
         board.load_from_fen("8/7n/3r1B1P/4Nk2/b7/5QB1/pKN1q1Pb/8 b");
 
-        let best_move = board.engine();
+        let best_move = board.engine_multithreaded();
 
         println!("{:?}", best_move.to_uci());
         println!("{:?} {:?}", best_move.from(), best_move.to());
