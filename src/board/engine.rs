@@ -220,7 +220,7 @@ impl Board {
         if *count % 1_000_000 == 0 {
             println!("Nodes searched: {}", count);
         }
-        const MAX_DEPTH: i32 = 10;
+        const MAX_DEPTH: i32 = 8;
         let remaining_depth = (MAX_DEPTH - depth) as i8;
 
         if let Some(score) = tt.get(self.hash, (MAX_DEPTH - depth) as i8) {

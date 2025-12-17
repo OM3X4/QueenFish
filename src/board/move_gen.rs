@@ -7,7 +7,7 @@ use super::constants::{
     BLACK_PAWN_ATTACKS, KING_ATTACK_TABLE, KNIGHTS_ATTACK_TABLE, SQUARE_RAYS, WHITE_PAWN_ATTACKS,
 };
 use super::constants::{FILE_A, FILE_H, RANK_2, RANK_7};
-use super::zobrist::{Z_PIECE, Z_SIDE};
+use super::zobrist::{Z_SIDE};
 use super::{Board, Move, PieceType, Turn};
 
 pub fn extract_bits(bitboard: u64) -> Vec<u64> {
@@ -572,7 +572,7 @@ impl Board {
         self.occupied = unmake_move.occupied;
     } //
 
-}
+}//
 
 #[cfg(test)]
 mod test {
