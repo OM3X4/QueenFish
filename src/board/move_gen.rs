@@ -113,7 +113,7 @@ impl Board {
     } //
 
     pub fn generate_black_pawns_moves(&self, moves: &mut Vec<Move>) {
-        let blockers = self.get_all_white_bits().0 | self.get_all_black_bits().0;
+        let blockers = self.occupied.0;
         let enemy_pieces_bb = self.get_all_white_bits();
 
         let mut add = |from: u64, to: u64, capture: bool| {
