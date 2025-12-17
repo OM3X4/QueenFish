@@ -76,15 +76,6 @@ impl Board {
 
         let enemy_pieces_bb = self.get_all_black_bits();
 
-        let mut add = |from: u64, to: u64, capture: bool| {
-            moves.push(Move::new(
-                from as u8,
-                to as u8,
-                PieceType::WhitePawn,
-                capture,
-            ));
-        };
-
         let mut pawns = self.bitboards.white_pawns.0;
 
         while pawns != 0 {
@@ -95,9 +86,19 @@ impl Board {
 
             // single and double jump
             if from < 55 && (blockers & 1u64 << from + 8) == 0 {
-                add(from.into(), (from + 8).into(), false);
+                moves.push(Move::new(
+                    from as u8,
+                    (from + 8) as u8,
+                    PieceType::WhitePawn,
+                    false,
+                ));
                 if (((1u64 << from) & RANK_2) != 0) && (blockers & 1u64 << (from + 16)) == 0 {
-                    add(from.into(), (from + 16).into(), false);
+                    moves.push(Move::new(
+                        from as u8,
+                        (from + 16) as u8,
+                        PieceType::WhitePawn,
+                        false,
+                    ));
                 }
             }
 
@@ -107,7 +108,7 @@ impl Board {
             while attacks != 0 {
                 let to = attacks.trailing_zeros() as u64;
                 attacks &= attacks - 1;
-                add(from.into(), to.into(), true);
+                moves.push(Move::new(from as u8, to as u8, PieceType::WhitePawn, true));
             }
         }
     } //
@@ -115,15 +116,6 @@ impl Board {
     pub fn generate_black_pawns_moves(&self, moves: &mut Vec<Move>) {
         let blockers = self.occupied.0;
         let enemy_pieces_bb = self.get_all_white_bits();
-
-        let mut add = |from: u64, to: u64, capture: bool| {
-            moves.push(Move::new(
-                from as u8,
-                to as u8,
-                PieceType::BlackPawn,
-                capture,
-            ));
-        };
 
         let mut pawns = self.bitboards.black_pawns.0;
 
@@ -135,9 +127,19 @@ impl Board {
 
             // single and double jump
             if from >= 8 && (blockers & 1u64 << (from - 8)) == 0 {
-                add(from.into(), (from - 8).into(), false);
+                moves.push(Move::new(
+                    from as u8,
+                    (from - 8) as u8,
+                    PieceType::WhitePawn,
+                    false,
+                ));
                 if (((1u64 << from) & RANK_7) != 0) && (blockers & (1u64 << (from - 16))) == 0 {
-                    add(from.into(), (from - 16).into(), false);
+                    moves.push(Move::new(
+                        from as u8,
+                        (from - 16) as u8,
+                        PieceType::WhitePawn,
+                        false,
+                    ));
                 }
             }
             // attacks
@@ -146,7 +148,7 @@ impl Board {
             while attacks != 0 {
                 let to = attacks.trailing_zeros() as u64;
                 attacks &= attacks - 1;
-                add(from.into(), to.into(), true);
+                moves.push(Move::new(from as u8, to as u8, PieceType::WhitePawn, true));
             }
         }
     } //
@@ -298,7 +300,7 @@ impl Board {
                 moves.push(Move::new(from as u8, to as u8, piece_type, capture));
             }
         }
-    }//
+    } //
 
     pub fn generate_bishop_moves(&self, moves: &mut Vec<Move>) {
         let allay_bits = &self.get_allay_pieces();
@@ -453,7 +455,7 @@ impl Board {
                 moves.push(Move::new(from as u8, to as u8, piece_type, capture));
             }
         }
-    }//
+    } //
 
     pub fn generate_queen_moves(&self, moves: &mut Vec<Move>) {
         let allay_bits = &self.get_allay_pieces();
