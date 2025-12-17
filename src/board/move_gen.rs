@@ -34,7 +34,7 @@ impl Board {
         while knights != 0 {
             let from = knights.trailing_zeros() as u64;
             knights &= knights - 1;
-            let mut attacks = KNIGHTS_ATTACK_TABLE.get(from as usize).unwrap() & !allay_bits;
+            let mut attacks = KNIGHTS_ATTACK_TABLE[from as usize] & !allay_bits;
 
             while attacks != 0 {
                 let to = attacks.trailing_zeros() as u64;
@@ -60,7 +60,7 @@ impl Board {
             return;
         }
 
-        let mut attacks = (KING_ATTACK_TABLE.get(from as usize).unwrap()) & !allay_bits;
+        let mut attacks = (KING_ATTACK_TABLE[from as usize]) & !allay_bits;
 
         while attacks != 0 {
             let to = attacks.trailing_zeros() as u64;
@@ -938,14 +938,14 @@ impl Board {
             Turn::WHITE => &self.bitboards.black_pawns.0,
         };
         let is_attacked_by_knights =
-            (KNIGHTS_ATTACK_TABLE.get(king_square as usize).unwrap() & enemy_knights) != 0;
+            (KNIGHTS_ATTACK_TABLE[king_square as usize] & enemy_knights) != 0;
 
         if is_attacked_by_knights {
             return true;
         }
 
         let is_attacked_by_king =
-            (KING_ATTACK_TABLE.get(king_square as usize).unwrap() & enemy_king) != 0;
+            (KING_ATTACK_TABLE[king_square as usize] & enemy_king) != 0;
 
         if is_attacked_by_king {
             return true;
