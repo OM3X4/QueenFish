@@ -44,3 +44,7 @@ path = "src/bin/test_best_move.rs"
 name = "perft"
 path = "src/bin/perft.rs"
 
+[[bin]]
+name = "moves_generation_perft"
+path = "src/bin/moves_generation_perft.rs"
+

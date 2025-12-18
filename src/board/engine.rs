@@ -4,7 +4,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use super::constants::FILES;
+
+use super::constants::{FILES};
 use super::zobrist::{Z_PIECE, Z_SIDE};
 use super::{Board, GameState, Move, PieceType, TTEntry, TranspositionTable, Turn};
 
@@ -166,11 +167,11 @@ impl Board {
         }
 
         bonus
-    }
+    } //
 
     pub fn evaluate(&mut self) -> f32 {
-        let mut score = self.pieces_score();
-        score += self.double_rook_bonus();
+        let score = self.pieces_score();
+        // score += self.double_rook_bonus();
 
         return score;
     } //
@@ -352,11 +353,32 @@ impl Board {
                 return best_score;
             }
         }
-    }
+    } //
 
     pub fn engine_singlethread(&mut self, max_depth: i32) -> Move {
         let mut moves = self.generate_moves();
         partition_by_bool(&mut moves, |mv| mv.is_capture());
+
+        let mut scored: Vec<(f32, Move)> = Vec::new();
+
+        for mv in &moves {
+            let unmake_move = self.make_move(*mv);
+
+            let mut score =
+                self.alpha_beta(0, 4, f32::MIN, f32::MAX, &mut TranspositionTable::new(20));
+
+            if self.turn == Turn::WHITE {
+                score = -score;
+            };
+
+            scored.push((score, *mv));
+
+            self.unmake_move(unmake_move);
+        };
+
+        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+
+        moves = scored.iter().map(|mv| mv.1).collect();
 
         let mut best_score = f32::MIN;
         let mut best_move = moves[0];
@@ -386,6 +408,27 @@ impl Board {
     pub fn engine_multithreaded(&mut self, max_depth: i32, number_of_threads: i32) -> Move {
         let mut moves = self.generate_moves();
         partition_by_bool(&mut moves, |mv| mv.is_capture());
+
+        let mut scored: Vec<(f32, Move)> = Vec::new();
+
+        for mv in &moves {
+            let unmake_move = self.make_move(*mv);
+
+            let mut score =
+                self.alpha_beta(0, 4, f32::MIN, f32::MAX, &mut TranspositionTable::new(20));
+
+            if self.turn == Turn::WHITE {
+                score = -score;
+            };
+
+            scored.push((score, *mv));
+
+            self.unmake_move(unmake_move);
+        }
+
+        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+
+        moves = scored.iter().map(|mv| mv.1).collect();
 
         let best = Arc::new(Mutex::new((f32::MIN, moves[0])));
 
