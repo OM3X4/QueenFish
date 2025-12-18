@@ -243,40 +243,53 @@ impl Board {
         tt: &mut TranspositionTable,
     ) -> f32 {
         NODE_COUNT.fetch_add(1, Ordering::Relaxed);
-        // if *count % 1_000_000 == 0 {
-        //     dbg!(*count);
-        // }
+
         let remaining_depth = (max_depth - depth) as i8;
 
-        if let Some(score) = tt.get(self.hash, (max_depth - depth) as i8) {
+        // 1. TT LOOKUP
+        if let Some(score) = tt.get(self.hash, remaining_depth) {
             return score;
         }
 
+        // 2. BASE CASE (Optimized)
+        // We stop here. We do NOT generate moves.
         if depth >= max_depth {
-            return self.evaluate();
+            let score = self.evaluate();
+            // Optional: Store static eval in TT if you want, though usually we cache search results
+            // tt.put(self.hash, remaining_depth, score);
+            return score;
         }
 
+        // 3. MOVE GENERATION (Only for internal nodes)
         let mut moves = SmallVec::new();
         self.generate_pesudo_moves(&mut moves);
+
+        // Move Ordering optimization: Score your moves here!
+        // moves.sort_by(...)
 
         let iter = moves
             .iter()
             .filter(|m| m.is_capture())
             .chain(moves.iter().filter(|m| !m.is_capture()));
 
+        let mut found_legal = false;
+
         match self.turn {
             Turn::WHITE => {
                 let mut best_score = f32::MIN;
+
                 for mv in iter {
                     let unmake_move = self.make_move(*mv);
 
-                    let is_illegal_move = self.is_king_in_check(self.opposite_turn());
-
-                    if is_illegal_move {
+                    // Filter illegal moves
+                    if self.is_king_in_check(self.opposite_turn()) {
                         self.unmake_move(unmake_move);
                         continue;
                     }
 
+                    found_legal = true;
+
+                    // RECURSE
                     let score = self.alpha_beta(depth + 1, max_depth, alpha, beta, tt);
 
                     self.unmake_move(unmake_move);
@@ -285,34 +298,35 @@ impl Board {
                     alpha = alpha.max(best_score);
 
                     if alpha >= beta {
-                        break;
+                        break; // Beta Cutoff
                     }
                 }
-                if best_score == f32::MIN {
-                    //all moves were illegal
+
+                // 4. CHECKMATE / STALEMATE (Internal Nodes Only)
+                if !found_legal {
                     if self.is_king_in_check(self.turn) {
-                        match self.turn {
-                            Turn::WHITE => return f32::MIN + depth as f32,
-                            Turn::BLACK => return f32::MAX - depth as f32,
-                        }
+                        return f32::MIN + depth as f32; // Checkmate (White loses)
                     } else {
-                        return 0.0;
+                        return 0.0; // Stalemate
                     }
                 };
+
                 tt.put(self.hash, remaining_depth, best_score);
                 return best_score;
-            } //
+            }
+
             Turn::BLACK => {
                 let mut best_score = f32::MAX;
+
                 for mv in iter {
                     let unmake_move = self.make_move(*mv);
 
-                    let is_illegal_move = self.is_king_in_check(self.opposite_turn());
-
-                    if is_illegal_move {
+                    if self.is_king_in_check(self.opposite_turn()) {
                         self.unmake_move(unmake_move);
                         continue;
                     }
+
+                    found_legal = true;
 
                     let score = self.alpha_beta(depth + 1, max_depth, alpha, beta, tt);
 
@@ -322,25 +336,23 @@ impl Board {
                     beta = beta.min(best_score);
 
                     if alpha >= beta {
-                        break;
+                        break; // Alpha Cutoff
                     }
                 }
-                if best_score == f32::MAX {
-                    //all moves were illegal
+
+                if !found_legal {
                     if self.is_king_in_check(self.turn) {
-                        match self.turn {
-                            Turn::WHITE => return f32::MIN + depth as f32,
-                            Turn::BLACK => return f32::MAX - depth as f32,
-                        }
+                        return f32::MAX - depth as f32; // Checkmate (Black loses)
                     } else {
-                        return 0.0;
+                        return 0.0; // Stalemate
                     }
                 };
+
                 tt.put(self.hash, remaining_depth, best_score);
                 return best_score;
-            } //
-        } //
-    } //
+            }
+        }
+    }
 
     pub fn engine_singlethread(&mut self, max_depth: i32) -> Move {
         let mut moves = self.generate_moves();
@@ -371,7 +383,7 @@ impl Board {
         return best_move;
     } //
 
-    pub fn engine_multithreaded(&mut self, max_depth: i32 , number_of_threads: i32) -> Move {
+    pub fn engine_multithreaded(&mut self, max_depth: i32, number_of_threads: i32) -> Move {
         let mut moves = self.generate_moves();
         partition_by_bool(&mut moves, |mv| mv.is_capture());
 
@@ -394,8 +406,7 @@ impl Board {
                 for mv in chunck {
                     let unmake_move = board.make_move(mv);
 
-                    let mut score =
-                        board.alpha_beta(0, max_depth, f32::MIN, f32::MAX, &mut tt);
+                    let mut score = board.alpha_beta(0, max_depth, f32::MIN, f32::MAX, &mut tt);
 
                     if board.turn == Turn::WHITE {
                         score = -score;
@@ -420,9 +431,9 @@ impl Board {
         return best.lock().unwrap().1.clone();
     } //
 
-    pub fn engine(&mut self , max_depth: i32 , threads: i32) -> Move {
+    pub fn engine(&mut self, max_depth: i32, threads: i32) -> Move {
         if threads > 1 {
-            self.engine_multithreaded(max_depth , threads)
+            self.engine_multithreaded(max_depth, threads)
         } else {
             self.engine_singlethread(max_depth)
         }
@@ -448,7 +459,7 @@ mod test {
         init_rook_magics();
 
         let mut board = Board::new();
-        board.load_from_fen("r2qk1nr/ppp1bppp/2n5/3p3b/6P1/2p4P/PP1NPP2/R1BQKBNR w");
+        board.load_from_fen("2kr3r/1pp3pp/p7/2b1np2/P3p1nq/4P3/1P1PBP1P/RNBQK2R w");
 
         let best_move = board.engine(7, 8);
 
