@@ -279,7 +279,7 @@ impl Board {
                         continue;
                     }
 
-                    let score = self.alpha_beta(depth + 1, max_depth,  alpha, beta, tt, count);
+                    let score = self.alpha_beta(depth + 1, max_depth, alpha, beta, tt, count);
 
                     self.unmake_move(unmake_move);
 
@@ -316,7 +316,7 @@ impl Board {
                         continue;
                     }
 
-                    let score = self.alpha_beta(depth + 1, max_depth,alpha, beta, tt, count);
+                    let score = self.alpha_beta(depth + 1, max_depth, alpha, beta, tt, count);
 
                     self.unmake_move(unmake_move);
 
@@ -344,7 +344,7 @@ impl Board {
         } //
     } //
 
-    pub fn engine(&mut self , max_depth: i32) -> Move {
+    pub fn engine_singlethread(&mut self, max_depth: i32) -> Move {
         let mut moves = self.generate_moves();
         partition_by_bool(&mut moves, |mv| mv.is_capture());
 
@@ -370,18 +370,17 @@ impl Board {
             self.unmake_move(unmake_move);
         }
 
-        dbg!(count);
         dbg!(NODE_COUNT.load(Ordering::Relaxed));
         return best_move;
     } //
 
-    pub fn engine_multithreaded(&mut self , max_depth: i32) -> Move {
+    pub fn engine_multithreaded(&mut self, max_depth: i32 , number_of_threads: i32) -> Move {
         let mut moves = self.generate_moves();
         partition_by_bool(&mut moves, |mv| mv.is_capture());
 
         let best = Arc::new(Mutex::new((f32::MIN, moves[0])));
 
-        let threads = 16;
+        let threads = number_of_threads as usize;
         let chunk_size = (moves.len() + threads - 1) / threads;
 
         let mut handles = Vec::new();
@@ -399,7 +398,8 @@ impl Board {
                 for mv in chunck {
                     let unmake_move = board.make_move(mv);
 
-                    let mut score = board.alpha_beta(0,max_depth, f32::MIN, f32::MAX, &mut tt, &mut count);
+                    let mut score =
+                        board.alpha_beta(0, max_depth, f32::MIN, f32::MAX, &mut tt, &mut count);
 
                     if board.turn == Turn::WHITE {
                         score = -score;
@@ -424,6 +424,14 @@ impl Board {
 
         return best.lock().unwrap().1.clone();
     } //
+
+    pub fn engine(&mut self , max_depth: i32 , threads: i32) -> Move {
+        if threads > 1 {
+            self.engine_multithreaded(max_depth , threads)
+        } else {
+            self.engine_singlethread(max_depth)
+        }
+    } //
 }
 
 mod test {
@@ -445,9 +453,9 @@ mod test {
         init_rook_magics();
 
         let mut board = Board::new();
-        board.load_from_fen("8/7n/3r1B1P/4Nk2/b7/5QB1/pKN1q1Pb/8 b");
+        // board.load_from_fen("8/7n/3r1B1P/4Nk2/b7/5QB1/pKN1q1Pb/8 b");
 
-        let best_move = board.engine_multithreaded(8);
+        let best_move = board.engine(7, 1);
 
         println!("{:?}", best_move.to_uci());
         println!("{:?} {:?}", best_move.from(), best_move.to());

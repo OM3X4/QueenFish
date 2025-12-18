@@ -15,6 +15,11 @@ tracing-flame = "0.2.0"
 tracing-subscriber = "0.3.22"
 smallvec = "1.13"
 
+[profile.test]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+
 [[bin]]
 name = "test_checkmate"
 path = "src/bin/test_checkmate.rs"
@@ -34,4 +39,8 @@ path = "src/bin/test_magics.rs"
 [[bin]]
 name = "test_best_move"
 path = "src/bin/test_best_move.rs"
+
+[[bin]]
+name = "perft"
+path = "src/bin/perft.rs"
 
