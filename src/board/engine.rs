@@ -241,9 +241,7 @@ impl Board {
         mut alpha: f32,
         mut beta: f32,
         tt: &mut TranspositionTable,
-        count: &mut u128,
     ) -> f32 {
-        *count += 1;
         NODE_COUNT.fetch_add(1, Ordering::Relaxed);
         // if *count % 1_000_000 == 0 {
         //     dbg!(*count);
@@ -279,7 +277,7 @@ impl Board {
                         continue;
                     }
 
-                    let score = self.alpha_beta(depth + 1, max_depth, alpha, beta, tt, count);
+                    let score = self.alpha_beta(depth + 1, max_depth, alpha, beta, tt);
 
                     self.unmake_move(unmake_move);
 
@@ -316,7 +314,7 @@ impl Board {
                         continue;
                     }
 
-                    let score = self.alpha_beta(depth + 1, max_depth, alpha, beta, tt, count);
+                    let score = self.alpha_beta(depth + 1, max_depth, alpha, beta, tt);
 
                     self.unmake_move(unmake_move);
 
@@ -327,7 +325,7 @@ impl Board {
                         break;
                     }
                 }
-                if best_score == f32::MIN {
+                if best_score == f32::MAX {
                     //all moves were illegal
                     if self.is_king_in_check(self.turn) {
                         match self.turn {
@@ -352,11 +350,10 @@ impl Board {
         let mut best_move = moves[0];
         let mut tt = TranspositionTable::new(20);
 
-        let mut count = 0;
         for mv in &moves {
             let unmake_move = self.make_move(*mv);
 
-            let mut score = self.alpha_beta(0, max_depth, f32::MIN, f32::MAX, &mut tt, &mut count);
+            let mut score = self.alpha_beta(0, max_depth, f32::MIN, f32::MAX, &mut tt);
 
             if self.turn == Turn::WHITE {
                 score = -score;
@@ -385,7 +382,6 @@ impl Board {
 
         let mut handles = Vec::new();
 
-        let mut count = 0;
         for chunck in moves.chunks(chunk_size) {
             let mut board = self.clone();
             let best = Arc::clone(&best);
@@ -399,7 +395,7 @@ impl Board {
                     let unmake_move = board.make_move(mv);
 
                     let mut score =
-                        board.alpha_beta(0, max_depth, f32::MIN, f32::MAX, &mut tt, &mut count);
+                        board.alpha_beta(0, max_depth, f32::MIN, f32::MAX, &mut tt);
 
                     if board.turn == Turn::WHITE {
                         score = -score;
@@ -420,7 +416,6 @@ impl Board {
         }
 
         dbg!(NODE_COUNT.load(Ordering::Relaxed));
-        dbg!(count);
 
         return best.lock().unwrap().1.clone();
     } //
@@ -453,9 +448,9 @@ mod test {
         init_rook_magics();
 
         let mut board = Board::new();
-        // board.load_from_fen("8/7n/3r1B1P/4Nk2/b7/5QB1/pKN1q1Pb/8 b");
+        board.load_from_fen("r2qk1nr/ppp1bppp/2n5/3p3b/6P1/2p4P/PP1NPP2/R1BQKBNR w");
 
-        let best_move = board.engine(7, 1);
+        let best_move = board.engine(7, 8);
 
         println!("{:?}", best_move.to_uci());
         println!("{:?} {:?}", best_move.from(), best_move.to());
