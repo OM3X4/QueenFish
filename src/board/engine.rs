@@ -1,11 +1,14 @@
 use smallvec::SmallVec;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 use super::constants::FILES;
 use super::zobrist::{Z_PIECE, Z_SIDE};
 use super::{Board, GameState, Move, PieceType, TTEntry, TranspositionTable, Turn};
+
+static NODE_COUNT: AtomicU64 = AtomicU64::new(0);
 
 impl TranspositionTable {
     pub fn new(size_pow2: usize) -> Self {
@@ -149,12 +152,10 @@ impl Board {
         let mut bonus: f32 = 0.0;
 
         for file in FILES {
-            let white_rooks_on_file = ((self.bitboards.0[PieceType::WhiteRook.piece_index()]).0
-                & file)
-                .count_ones();
-            let black_rooks_on_file = ((self.bitboards.0[PieceType::BlackRook.piece_index()]).0
-                & file)
-                .count_ones();
+            let white_rooks_on_file =
+                ((self.bitboards.0[PieceType::WhiteRook.piece_index()]).0 & file).count_ones();
+            let black_rooks_on_file =
+                ((self.bitboards.0[PieceType::BlackRook.piece_index()]).0 & file).count_ones();
 
             if white_rooks_on_file >= 2 {
                 bonus += 0.5;
@@ -236,23 +237,24 @@ impl Board {
     pub fn alpha_beta(
         &mut self,
         depth: i32,
+        max_depth: i32,
         mut alpha: f32,
         mut beta: f32,
         tt: &mut TranspositionTable,
         count: &mut u128,
     ) -> f32 {
         *count += 1;
+        NODE_COUNT.fetch_add(1, Ordering::Relaxed);
         // if *count % 1_000_000 == 0 {
         //     dbg!(*count);
         // }
-        const MAX_DEPTH: i32 = 9;
-        let remaining_depth = (MAX_DEPTH - depth) as i8;
+        let remaining_depth = (max_depth - depth) as i8;
 
-        if let Some(score) = tt.get(self.hash, (MAX_DEPTH - depth) as i8) {
+        if let Some(score) = tt.get(self.hash, (max_depth - depth) as i8) {
             return score;
         }
 
-        if depth >= MAX_DEPTH {
+        if depth >= max_depth {
             return self.evaluate();
         }
 
@@ -277,7 +279,7 @@ impl Board {
                         continue;
                     }
 
-                    let score = self.alpha_beta(depth + 1, alpha, beta, tt, count);
+                    let score = self.alpha_beta(depth + 1, max_depth,  alpha, beta, tt, count);
 
                     self.unmake_move(unmake_move);
 
@@ -314,7 +316,7 @@ impl Board {
                         continue;
                     }
 
-                    let score = self.alpha_beta(depth + 1, alpha, beta, tt, count);
+                    let score = self.alpha_beta(depth + 1, max_depth,alpha, beta, tt, count);
 
                     self.unmake_move(unmake_move);
 
@@ -342,7 +344,7 @@ impl Board {
         } //
     } //
 
-    pub fn engine(&mut self) -> Move {
+    pub fn engine(&mut self , max_depth: i32) -> Move {
         let mut moves = self.generate_moves();
         partition_by_bool(&mut moves, |mv| mv.is_capture());
 
@@ -354,7 +356,7 @@ impl Board {
         for mv in &moves {
             let unmake_move = self.make_move(*mv);
 
-            let mut score = self.alpha_beta(0, f32::MIN, f32::MAX, &mut tt, &mut count);
+            let mut score = self.alpha_beta(0, max_depth, f32::MIN, f32::MAX, &mut tt, &mut count);
 
             if self.turn == Turn::WHITE {
                 score = -score;
@@ -366,13 +368,14 @@ impl Board {
             }
 
             self.unmake_move(unmake_move);
-        };
+        }
 
         dbg!(count);
+        dbg!(NODE_COUNT.load(Ordering::Relaxed));
         return best_move;
-    }//
+    } //
 
-    pub fn engine_multithreaded(&mut self) -> Move {
+    pub fn engine_multithreaded(&mut self , max_depth: i32) -> Move {
         let mut moves = self.generate_moves();
         partition_by_bool(&mut moves, |mv| mv.is_capture());
 
@@ -388,8 +391,7 @@ impl Board {
             let mut board = self.clone();
             let best = Arc::clone(&best);
             let mut chunck = chunck.to_vec();
-            partition_by_bool(&mut chunck , |mv| mv.is_capture());
-
+            partition_by_bool(&mut chunck, |mv| mv.is_capture());
 
             handles.push(thread::spawn(move || {
                 let mut tt = TranspositionTable::new(20);
@@ -397,7 +399,7 @@ impl Board {
                 for mv in chunck {
                     let unmake_move = board.make_move(mv);
 
-                    let mut score = board.alpha_beta(0, f32::MIN, f32::MAX, &mut tt, &mut count);
+                    let mut score = board.alpha_beta(0,max_depth, f32::MIN, f32::MAX, &mut tt, &mut count);
 
                     if board.turn == Turn::WHITE {
                         score = -score;
@@ -411,12 +413,14 @@ impl Board {
                     board.unmake_move(unmake_move);
                 }
             }));
-
-        };
+        }
 
         for handle in handles {
             handle.join().unwrap();
         }
+
+        dbg!(NODE_COUNT.load(Ordering::Relaxed));
+        dbg!(count);
 
         return best.lock().unwrap().1.clone();
     } //
@@ -443,7 +447,7 @@ mod test {
         let mut board = Board::new();
         board.load_from_fen("8/7n/3r1B1P/4Nk2/b7/5QB1/pKN1q1Pb/8 b");
 
-        let best_move = board.engine_multithreaded();
+        let best_move = board.engine_multithreaded(8);
 
         println!("{:?}", best_move.to_uci());
         println!("{:?} {:?}", best_move.from(), best_move.to());
