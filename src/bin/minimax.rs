@@ -9,7 +9,7 @@ fn main() {
     let start = std::time::Instant::now();
 
     let mut board = Board::new();
-    board.load_from_fen("5b2/3k1b2/7p/1n1PR3/2p3q1/5Q1R/2pr1N1K/7N w");
+    // board.load_from_fen("2b2r2/rp1nb1p1/1q1p1n1k/p1p1Np2/1PQPp3/P1N1P3/2P2PPP/2RK1B1R w");
     // let best_move = board.engine_multithreaded();
     let best_move = board.engine_multithreaded();
     // for _ in 0..20_000_000 {

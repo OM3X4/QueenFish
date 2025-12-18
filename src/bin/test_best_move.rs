@@ -17,7 +17,7 @@ fn main() {
     // println!("{}", board.to_fen());
 
     // dbg!(board.turn);
-    let best_move = board.engine();
+    let best_move = board.engine_multithreaded();
 
     println!("{:?} {:?}", best_move.from() , best_move.to());
 }

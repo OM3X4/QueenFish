@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+use super::constants::FILES;
 use super::zobrist::{Z_PIECE, Z_SIDE};
 use super::{Board, GameState, Move, PieceType, TTEntry, TranspositionTable, Turn};
 
@@ -21,7 +22,7 @@ impl TranspositionTable {
     }
 
     #[inline(always)]
-    pub fn get(&self, key: u64, depth: i8) -> Option<i32> {
+    pub fn get(&self, key: u64, depth: i8) -> Option<f32> {
         let entry = self.table[self.index(key)]?;
         if entry.key == key && entry.depth >= depth {
             Some(entry.score)
@@ -31,7 +32,7 @@ impl TranspositionTable {
     }
 
     #[inline(always)]
-    pub fn put(&mut self, key: u64, depth: i8, score: i32) {
+    pub fn put(&mut self, key: u64, depth: i8, score: f32) {
         let idx = self.index(key);
         self.table[idx] = Some(TTEntry { key, depth, score });
     }
@@ -96,8 +97,8 @@ impl Board {
     } //
 
     /// The score is turn agnostic , it always returns the score of the white player
-    pub fn pieces_score(&self) -> i32 {
-        let mut score: i32 = 0;
+    pub fn pieces_score(&self) -> f32 {
+        let mut score: f32 = 0.0;
         let num_of_knights = (self.bitboards.0[PieceType::WhiteKnight.piece_index()])
             .0
             .count_ones();
@@ -130,37 +131,59 @@ impl Board {
             .0
             .count_ones();
 
-        score += (num_of_knights * 3) as i32;
-        score += (num_of_pawns * 1) as i32;
-        score += (num_of_bishops * 3) as i32;
-        score += (num_of_rooks * 5) as i32;
-        score += (num_of_queens * 9) as i32;
+        score += (num_of_knights * 3) as f32;
+        score += (num_of_pawns * 1) as f32;
+        score += (num_of_bishops * 3) as f32;
+        score += (num_of_rooks * 5) as f32;
+        score += (num_of_queens * 9) as f32;
 
-        score -= (num_of_enemy_knights * 3) as i32;
-        score -= (num_of_enemy_pawns * 1) as i32;
-        score -= (num_of_enemy_bishops * 3) as i32;
-        score -= (num_of_enemy_rooks * 5) as i32;
-        score -= (num_of_enemy_queens * 9) as i32;
-
+        score -= (num_of_enemy_knights * 3) as f32;
+        score -= (num_of_enemy_pawns * 1) as f32;
+        score -= (num_of_enemy_bishops * 3) as f32;
+        score -= (num_of_enemy_rooks * 5) as f32;
+        score -= (num_of_enemy_queens * 9) as f32;
         score
     } //
 
-    pub fn evaluate(&mut self) -> i32 {
-        let score = self.pieces_score();
+    pub fn double_rook_bonus(&self) -> f32 {
+        let mut bonus: f32 = 0.0;
+
+        for file in FILES {
+            let white_rooks_on_file = ((self.bitboards.0[PieceType::WhiteRook.piece_index()]).0
+                & file)
+                .count_ones();
+            let black_rooks_on_file = ((self.bitboards.0[PieceType::BlackRook.piece_index()]).0
+                & file)
+                .count_ones();
+
+            if white_rooks_on_file >= 2 {
+                bonus += 0.5;
+            }
+            if black_rooks_on_file >= 2 {
+                bonus -= 0.5;
+            }
+        }
+
+        bonus
+    }
+
+    pub fn evaluate(&mut self) -> f32 {
+        let mut score = self.pieces_score();
+        score += self.double_rook_bonus();
 
         return score;
     } //
 
     //currently only play for white
-    pub fn minimax(&mut self, depth: i32, moves_map: &mut HashMap<u64, (i32, i32)>) -> i32 {
+    pub fn minimax(&mut self, depth: i32, moves_map: &mut HashMap<u64, (f32, i32)>) -> f32 {
         let game_state = self.get_game_state();
         if game_state == GameState::CheckMate {
             match self.turn {
-                Turn::WHITE => return i32::MIN + depth,
-                Turn::BLACK => return i32::MAX - depth,
+                Turn::WHITE => return f32::MIN + depth as f32,
+                Turn::BLACK => return f32::MAX - depth as f32,
             }
         } else if game_state == GameState::StaleMate {
-            return 0;
+            return 0.0;
         }
 
         if depth >= 4 {
@@ -176,7 +199,7 @@ impl Board {
         let moves = self.generate_moves();
         match self.turn {
             Turn::WHITE => {
-                let mut best_score = i32::MIN;
+                let mut best_score = f32::MIN;
                 for mv in moves {
                     let unmake_move = self.make_move(mv);
 
@@ -192,7 +215,7 @@ impl Board {
                 return best_score;
             } //
             Turn::BLACK => {
-                let mut best_score = i32::MAX;
+                let mut best_score = f32::MAX;
                 for mv in moves {
                     let unmake_move = self.make_move(mv);
 
@@ -213,11 +236,11 @@ impl Board {
     pub fn alpha_beta(
         &mut self,
         depth: i32,
-        mut alpha: i32,
-        mut beta: i32,
+        mut alpha: f32,
+        mut beta: f32,
         tt: &mut TranspositionTable,
         count: &mut u128,
-    ) -> i32 {
+    ) -> f32 {
         *count += 1;
         // if *count % 1_000_000 == 0 {
         //     dbg!(*count);
@@ -243,7 +266,7 @@ impl Board {
 
         match self.turn {
             Turn::WHITE => {
-                let mut best_score = i32::MIN;
+                let mut best_score = f32::MIN;
                 for mv in iter {
                     let unmake_move = self.make_move(*mv);
 
@@ -265,22 +288,22 @@ impl Board {
                         break;
                     }
                 }
-                if best_score == i32::MIN {
+                if best_score == f32::MIN {
                     //all moves were illegal
                     if self.is_king_in_check(self.turn) {
                         match self.turn {
-                            Turn::WHITE => return i32::MIN + depth,
-                            Turn::BLACK => return i32::MAX - depth,
+                            Turn::WHITE => return f32::MIN + depth as f32,
+                            Turn::BLACK => return f32::MAX - depth as f32,
                         }
                     } else {
-                        return 0;
+                        return 0.0;
                     }
                 };
                 tt.put(self.hash, remaining_depth, best_score);
                 return best_score;
             } //
             Turn::BLACK => {
-                let mut best_score = i32::MAX;
+                let mut best_score = f32::MAX;
                 for mv in iter {
                     let unmake_move = self.make_move(*mv);
 
@@ -302,15 +325,15 @@ impl Board {
                         break;
                     }
                 }
-                if best_score == i32::MIN {
+                if best_score == f32::MIN {
                     //all moves were illegal
                     if self.is_king_in_check(self.turn) {
                         match self.turn {
-                            Turn::WHITE => return i32::MIN + depth,
-                            Turn::BLACK => return i32::MAX - depth,
+                            Turn::WHITE => return f32::MIN + depth as f32,
+                            Turn::BLACK => return f32::MAX - depth as f32,
                         }
                     } else {
-                        return 0;
+                        return 0.0;
                     }
                 };
                 tt.put(self.hash, remaining_depth, best_score);
@@ -323,7 +346,7 @@ impl Board {
         let mut moves = self.generate_moves();
         partition_by_bool(&mut moves, |mv| mv.is_capture());
 
-        let mut best_score = i32::MIN;
+        let mut best_score = f32::MIN;
         let mut best_move = moves[0];
         let mut tt = TranspositionTable::new(20);
 
@@ -331,7 +354,7 @@ impl Board {
         for mv in &moves {
             let unmake_move = self.make_move(*mv);
 
-            let mut score = self.alpha_beta(0, i32::MIN, i32::MAX, &mut tt, &mut count);
+            let mut score = self.alpha_beta(0, f32::MIN, f32::MAX, &mut tt, &mut count);
 
             if self.turn == Turn::WHITE {
                 score = -score;
@@ -343,15 +366,17 @@ impl Board {
             }
 
             self.unmake_move(unmake_move);
-        }
+        };
+
+        dbg!(count);
         return best_move;
-    }
+    }//
 
     pub fn engine_multithreaded(&mut self) -> Move {
         let mut moves = self.generate_moves();
         partition_by_bool(&mut moves, |mv| mv.is_capture());
 
-        let best = Arc::new(Mutex::new((i32::MIN, moves[0])));
+        let best = Arc::new(Mutex::new((f32::MIN, moves[0])));
 
         let threads = 16;
         let chunk_size = (moves.len() + threads - 1) / threads;
@@ -372,7 +397,7 @@ impl Board {
                 for mv in chunck {
                     let unmake_move = board.make_move(mv);
 
-                    let mut score = board.alpha_beta(0, i32::MIN, i32::MAX, &mut tt, &mut count);
+                    let mut score = board.alpha_beta(0, f32::MIN, f32::MAX, &mut tt, &mut count);
 
                     if board.turn == Turn::WHITE {
                         score = -score;
@@ -403,7 +428,7 @@ mod test {
     fn is_position_equal() {
         use super::Board;
         let mut board = Board::new();
-        assert_eq!(board.evaluate(), 0);
+        assert_eq!(board.evaluate(), 0.0);
     }
 
     #[test]
