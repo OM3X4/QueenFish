@@ -247,9 +247,9 @@ impl Board {
         let remaining_depth = (max_depth - depth) as i8;
 
         // 1. TT LOOKUP
-        if let Some(score) = tt.get(self.hash, remaining_depth) {
-            return score;
-        }
+        // if let Some(score) = tt.get(self.hash, remaining_depth) {
+        //     return score;
+        // }
 
         // 2. BASE CASE (Optimized)
         // We stop here. We do NOT generate moves.
@@ -300,7 +300,7 @@ impl Board {
                     if alpha >= beta {
                         break; // Beta Cutoff
                     }
-                }
+                };
 
                 // 4. CHECKMATE / STALEMATE (Internal Nodes Only)
                 if !found_legal {
