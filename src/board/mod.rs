@@ -25,6 +25,21 @@ pub enum Bound {
     Exact,
 }
 
+const PIECE_VALUE: [i8; 12] = [
+    1, // WhitePawn
+    3, // WhiteKnight
+    3, // WhiteBishop
+    5, // WhiteRook
+    9, // WhiteQueen
+    0, // WhiteKing
+    1, // BlackPawn
+    3, // BlackKnight
+    3, // BlackBishop
+    5, // BlackRook
+    9, // BlackQueen
+    0, // BlackKing
+];
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum PieceType {
     WhitePawn = 0,
@@ -43,8 +58,11 @@ pub enum PieceType {
 
 impl PieceType {
     #[inline(always)]
-    pub fn piece_index(&self) -> usize {
-        *self as usize
+    pub fn piece_index(self) -> usize {
+        self as usize
+    }
+    pub fn value(self) -> i8 {
+        unsafe { *PIECE_VALUE.get_unchecked(self as usize) }
     }
 }
 

@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use super::constants::FILES;
+use super::constants::{FILES, MVV_LVA};
 use super::zobrist::{Z_PIECE, Z_SIDE};
 use super::{Board, GameState, Move, PieceType, TTEntry, TranspositionTable, Turn};
 
@@ -53,6 +53,23 @@ fn partition_by_bool<T>(v: &mut [T], pred: impl Fn(&T) -> bool) {
             v.swap(left, right);
         }
     }
+}
+
+#[inline(always)]
+fn partition_captures<T>(v: &mut [T], mut pred: impl FnMut(&T) -> bool) -> usize {
+    let mut left = 0;
+    let mut right = v.len();
+
+    while left < right {
+        if pred(&v[left]) {
+            left += 1;
+        } else {
+            right -= 1;
+            v.swap(left, right);
+        }
+    }
+
+    left // number of elements matching pred
 }
 
 impl Board {
@@ -165,7 +182,7 @@ impl Board {
             + bbs[10].0.count_ones() as i32 * 9;
 
         white - black
-    }//
+    } //
 
     pub fn double_rook_bonus(&self) -> f32 {
         let mut bonus: f32 = 0.0;
@@ -193,6 +210,31 @@ impl Board {
 
         return score;
     } //
+
+    #[inline(always)]
+    pub fn mvv_lva(&self, mv: Move) -> i32 {
+        if !mv.is_capture() {
+            return 0;
+        }
+
+        let victim = self.piece_at[mv.to() as usize].unwrap();
+        let attacker = mv.piece();
+
+        MVV_LVA[(victim.piece_index() % 6) as usize][(attacker.piece_index() % 6) as usize]
+    } //
+
+    pub fn sort_by_mvv_lva(&mut self, moves: &mut SmallVec<[Move; 256]>) {
+        let split = partition_captures(moves, |mv| mv.is_capture());
+
+        // Sort captures only
+        moves[..split].sort_unstable_by(|a, b| {
+            let va = self.mvv_lva(*a);
+            let vb = self.mvv_lva(*b);
+            vb.cmp(&va)
+        });
+
+        // Quiet moves stay untouched
+    }//
 
     //currently only play for white
     pub fn minimax(&mut self, depth: i32, moves_map: &mut HashMap<u64, (i32, i32)>) -> i32 {
@@ -263,6 +305,10 @@ impl Board {
     ) -> i32 {
         NODE_COUNT.fetch_add(1, Ordering::Relaxed);
 
+        if NODE_COUNT.load(Ordering::Relaxed) % 10_000_000 == 0 {
+            println!("Nodes: {}", NODE_COUNT.load(Ordering::Relaxed));
+        }
+
         let remaining_depth = (max_depth - depth) as i8;
 
         // 1. TT LOOKUP
@@ -283,13 +329,17 @@ impl Board {
         let mut moves = SmallVec::new();
         self.generate_pesudo_moves(&mut moves);
 
+        self.sort_by_mvv_lva(&mut moves);
+
+        let iter = moves.iter();
+
         // Move Ordering optimization: Score your moves here!
         // moves.sort_by(...)
 
-        let iter = moves
-            .iter()
-            .filter(|m| m.is_capture())
-            .chain(moves.iter().filter(|m| !m.is_capture()));
+        // let iter = moves
+        //     .iter()
+        //     .filter(|m| m.is_capture())
+        //     .chain(moves.iter().filter(|m| !m.is_capture()));
 
         let mut found_legal = false;
 
@@ -330,7 +380,7 @@ impl Board {
                     }
                 };
 
-                tt.put(self.hash, remaining_depth, best_score);
+                // tt.put(self.hash, remaining_depth, best_score);
                 return best_score;
             }
 
@@ -367,7 +417,7 @@ impl Board {
                     }
                 };
 
-                tt.put(self.hash, remaining_depth, best_score);
+                // tt.put(self.hash, remaining_depth, best_score);
                 return best_score;
             }
         }

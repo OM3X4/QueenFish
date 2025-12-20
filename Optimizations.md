@@ -10,3 +10,4 @@
 8. Use a reference to a mutable Vector instead of creating a vector in every function
 9. Set the size of the Vector in the start
 10. packed moves inside a single u32
+11. Added MVV-LVA

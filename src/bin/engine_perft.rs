@@ -24,21 +24,21 @@ fn main() {
         println!("Best Move: {}", best_move.to_uci());
         println!("-------------------------------------------------\n");
 
-        println!("-------------------------------------------------");
-        println!("8 Threads Engine:");
-        let start = std::time::Instant::now();
-        let best_move = board.engine(depth , 8);
-        println!("Time taken: {:?}", start.elapsed());
-        println!("Best Move: {}", best_move.to_uci());
-        println!("-------------------------------------------------\n");
+        // println!("-------------------------------------------------");
+        // println!("8 Threads Engine:");
+        // let start = std::time::Instant::now();
+        // let best_move = board.engine(depth , 8);
+        // println!("Time taken: {:?}", start.elapsed());
+        // println!("Best Move: {}", best_move.to_uci());
+        // println!("-------------------------------------------------\n");
 
-        println!("-------------------------------------------------");
-        println!("16 Threads Engine:");
-        let start = std::time::Instant::now();
-        let best_move = board.engine(depth , 16);
-        println!("Time taken: {:?}", start.elapsed());
-        println!("Best Move: {}", best_move.to_uci());
-        println!("-------------------------------------------------\n");
+        // println!("-------------------------------------------------");
+        // println!("16 Threads Engine:");
+        // let start = std::time::Instant::now();
+        // let best_move = board.engine(depth , 16);
+        // println!("Time taken: {:?}", start.elapsed());
+        // println!("Best Move: {}", best_move.to_uci());
+        // println!("-------------------------------------------------\n");
     }//
 
 
@@ -60,21 +60,21 @@ fn main() {
         println!("Best Move: {}", best_move.to_uci());
         println!("-------------------------------------------------\n");
 
-        println!("-------------------------------------------------");
-        println!("8 Threads Engine:");
-        let start = std::time::Instant::now();
-        let best_move = board.engine(depth , 8);
-        println!("Time taken: {:?}", start.elapsed());
-        println!("Best Move: {}", best_move.to_uci());
-        println!("-------------------------------------------------\n");
+        // println!("-------------------------------------------------");
+        // println!("8 Threads Engine:");
+        // let start = std::time::Instant::now();
+        // let best_move = board.engine(depth , 8);
+        // println!("Time taken: {:?}", start.elapsed());
+        // println!("Best Move: {}", best_move.to_uci());
+        // println!("-------------------------------------------------\n");
 
-        println!("-------------------------------------------------");
-        println!("16 Threads Engine:");
-        let start = std::time::Instant::now();
-        let best_move = board.engine(depth , 16);
-        println!("Time taken: {:?}", start.elapsed());
-        println!("Best Move: {}", best_move.to_uci());
-        println!("-------------------------------------------------\n");
+        // println!("-------------------------------------------------");
+        // println!("16 Threads Engine:");
+        // let start = std::time::Instant::now();
+        // let best_move = board.engine(depth , 16);
+        // println!("Time taken: {:?}", start.elapsed());
+        // println!("Best Move: {}", best_move.to_uci());
+        // println!("-------------------------------------------------\n");
     }//
 
 
