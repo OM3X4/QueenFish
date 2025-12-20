@@ -100,7 +100,7 @@ impl Board {
     } //
 
     /// The score is turn agnostic , it always returns the score of the white player
-    pub fn pieces_score(&self) -> f32 {
+    pub fn pieces_score_old(&self) -> f32 {
         let mut score: f32 = 0.0;
         let num_of_knights = (self.bitboards.0[PieceType::WhiteKnight.piece_index()])
             .0
@@ -147,6 +147,25 @@ impl Board {
         score -= (num_of_enemy_queens * 9) as f32;
         score
     } //
+
+    #[inline(always)]
+    pub fn pieces_score(&self) -> f32 {
+        let bbs = &self.bitboards.0;
+
+        let white = bbs[0].0.count_ones() as i32 * 1   // pawn
+        + bbs[1].0.count_ones() as i32 * 3   // knight
+        + bbs[2].0.count_ones() as i32 * 3   // bishop
+        + bbs[3].0.count_ones() as i32 * 5   // rook
+        + bbs[4].0.count_ones() as i32 * 9; // queen
+
+        let black = bbs[6].0.count_ones() as i32 * 1
+            + bbs[7].0.count_ones() as i32 * 3
+            + bbs[8].0.count_ones() as i32 * 3
+            + bbs[9].0.count_ones() as i32 * 5
+            + bbs[10].0.count_ones() as i32 * 9;
+
+        (white - black) as f32
+    }//
 
     pub fn double_rook_bonus(&self) -> f32 {
         let mut bonus: f32 = 0.0;
@@ -300,7 +319,7 @@ impl Board {
                     if alpha >= beta {
                         break; // Beta Cutoff
                     }
-                };
+                }
 
                 // 4. CHECKMATE / STALEMATE (Internal Nodes Only)
                 if !found_legal {
@@ -481,7 +500,7 @@ impl Board {
         }
     } //
 
-    pub fn perft(&mut self, depth: i32 , max_depth: i32) -> i64 {
+    pub fn perft(&mut self, depth: i32, max_depth: i32) -> i64 {
         if depth == max_depth {
             return 1;
         }
@@ -506,7 +525,7 @@ impl Board {
                 continue;
             }
 
-            nodes += self.perft(depth + 1 , max_depth);
+            nodes += self.perft(depth + 1, max_depth);
 
             self.unmake_move(unmake);
             // assert_eq!(*self, before);
@@ -553,6 +572,6 @@ mod test {
         use super::Board;
         let mut board = Board::new();
         // board.load_from_fen("2kr3r/1pp3pp/p7/2b1np2/P3p1nq/4P3/1P1PBP1P/RNBQK2R w");
-        dbg!(board.perft(0 , 4));
+        dbg!(board.perft(0, 4));
     }
 }
