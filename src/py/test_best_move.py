@@ -47,21 +47,25 @@ def safe_random_fen():
 # --------------------------------------------------
 # Stockfish top-5 moves
 # --------------------------------------------------
-def stockfish_top5(board: chess.Board, engine, depth=10):
+def stockfish_top5(board: chess.Board, engine, time_sec=3):
     infos = engine.analyse(
         board,
-        chess.engine.Limit(depth=depth),
-        multipv=2
+        chess.engine.Limit(time=time_sec),
+        multipv=10
     )
 
-    top5 = set()
+    scored_moves = []
+
     for info in infos:
         pv = info.get("pv")
-        if not pv:
+        score = info.get("score")
+
+        if not pv or score is None:
             continue
+
         move = pv[0]
 
-        # Enforce same constraints
+        # Enforce constraints
         if move.promotion is not None:
             continue
         if board.is_castling(move):
@@ -69,9 +73,18 @@ def stockfish_top5(board: chess.Board, engine, depth=10):
         if board.is_en_passant(move):
             continue
 
-        top5.add((move.from_square, move.to_square))
+        eval_cp = score.pov(board.turn).score(mate_score=10_000)
+        scored_moves.append((eval_cp, move))
 
-    return top5
+    # Sort by evaluation (best first)
+    scored_moves.sort(reverse=True, key=lambda x: x[0])
+
+    # Keep top 5
+    return [
+        (move.from_square, move.to_square)
+        for _, move in scored_moves[:5]
+    ]
+
 
 
 # --------------------------------------------------
@@ -96,7 +109,7 @@ with chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH) as sf:
         fen = safe_random_fen()
         board = chess.Board(fen)
 
-        top5 = stockfish_top5(board, sf, depth=10)
+        top5 = stockfish_top5(board, sf, time_sec=3)
 
         minimal_fen = fen.split(" ")[0:2]
 

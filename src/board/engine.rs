@@ -4,6 +4,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+use crate::board::constants::{RANK_1 , RANK_8};
+
 use super::constants::{FILES, MVV_LVA};
 use super::zobrist::{Z_PIECE, Z_SIDE};
 use super::{Board, GameState, Move, PieceType, TTEntry, TranspositionTable, Turn};
@@ -184,6 +186,14 @@ impl Board {
         white - black
     } //
 
+    #[inline(always)]
+    pub fn development_score(&self) -> i32 {
+        let black = (self.bitboards.0[PieceType::BlackBishop.piece_index()].0 | self.bitboards.0[PieceType::BlackKnight.piece_index()].0) & RANK_8;
+        let white = (self.bitboards.0[PieceType::WhiteBishop.piece_index()].0 | self.bitboards.0[PieceType::WhiteKnight.piece_index()].0) & RANK_1;
+
+        black.count_ones() as i32 - white.count_ones() as i32
+    }
+
     pub fn double_rook_bonus(&self) -> f32 {
         let mut bonus: f32 = 0.0;
 
@@ -205,8 +215,8 @@ impl Board {
     } //
 
     pub fn evaluate(&mut self) -> i32 {
-        let score = self.pieces_score();
-        // score += self.double_rook_bonus();
+        let mut score = self.pieces_score();
+        score += self.development_score();
 
         return score;
     } //
@@ -305,9 +315,9 @@ impl Board {
     ) -> i32 {
         NODE_COUNT.fetch_add(1, Ordering::Relaxed);
 
-        if NODE_COUNT.load(Ordering::Relaxed) % 10_000_000 == 0 {
-            println!("Nodes: {}", NODE_COUNT.load(Ordering::Relaxed));
-        }
+        // if NODE_COUNT.load(Ordering::Relaxed) % 10_000_000 == 0 {
+        //     dbg!("Nodes: {}", NODE_COUNT.load(Ordering::Relaxed));
+        // }
 
         let remaining_depth = (max_depth - depth) as i8;
 
@@ -474,6 +484,7 @@ impl Board {
     } //
 
     pub fn engine_multithreaded(&mut self, max_depth: i32, number_of_threads: i32) -> Move {
+        let start_time = std::time::Instant::now();
         let mut moves = self.generate_moves();
         partition_by_bool(&mut moves, |mv| mv.is_capture());
 
@@ -537,6 +548,7 @@ impl Board {
             handle.join().unwrap();
         }
 
+        dbg!(start_time.elapsed().as_millis());
         dbg!(NODE_COUNT.load(Ordering::Relaxed));
 
         return best.lock().unwrap().1.clone();

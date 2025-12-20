@@ -21,6 +21,7 @@ MOVE_DELAY_SEC = 0.2    # readability
 # RUN YOUR ENGINE FOR ONE MOVE
 # ==================================================
 def engine_move(board: chess.Board):
+    start = time.time()
     minimal_fen = board.fen().split(" ")[0:2]
     fen_input = minimal_fen[0] + " " + minimal_fen[1]
 
@@ -37,6 +38,7 @@ def engine_move(board: chess.Board):
         print("ENGINE STDERR:", err)
 
     frm, to = map(int, out.strip().split())
+    print(f"Engine took {time.time() - start} seconds to make a move")
     return chess.Move(frm, to)
 
 # ==================================================
@@ -90,6 +92,15 @@ def play_game():
         print("\n=== GAME OVER ===")
         print("Result:", board.result())
         print("Final FEN:", board.fen())
+
+# ==================================================
+# BUILD ENGINE
+subprocess.run(
+    ["cargo", "build", "--release"],
+    cwd="C:/Learn/LearnRust/chess",
+    check=True
+)
+# ==================================================
 
 # ==================================================
 # ENTRY POINT

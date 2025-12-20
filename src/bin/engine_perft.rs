@@ -10,6 +10,7 @@ fn main() {
     // Starting Position
     {
         let mut board = Board::new();
+        // board.load_from_fen("rnbqkbnr/ppp2ppp/4p3/3p4/2P5/P7/1P1PPPPP/RNBQKBNR w");
         println!("################################################");
         println!("################################################");
         println!("Starting Position:");
@@ -24,13 +25,13 @@ fn main() {
         println!("Best Move: {}", best_move.to_uci());
         println!("-------------------------------------------------\n");
 
-        // println!("-------------------------------------------------");
-        // println!("8 Threads Engine:");
-        // let start = std::time::Instant::now();
-        // let best_move = board.engine(depth , 8);
-        // println!("Time taken: {:?}", start.elapsed());
-        // println!("Best Move: {}", best_move.to_uci());
-        // println!("-------------------------------------------------\n");
+        println!("-------------------------------------------------");
+        println!("8 Threads Engine:");
+        let start = std::time::Instant::now();
+        let best_move = board.engine(depth , 8);
+        println!("Time taken: {:?}", start.elapsed());
+        println!("Best Move: {}", best_move.to_uci());
+        println!("-------------------------------------------------\n");
 
         // println!("-------------------------------------------------");
         // println!("16 Threads Engine:");

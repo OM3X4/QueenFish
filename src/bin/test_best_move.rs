@@ -17,7 +17,8 @@ fn main() {
     // println!("{}", board.to_fen());
 
     // dbg!(board.turn);
-    let best_move = board.engine(7 , 12);
+    let best_move = board.engine(8 , 8);
 
+    dbg!(best_move.to_uci());
     println!("{:?} {:?}", best_move.from() , best_move.to());
 }
