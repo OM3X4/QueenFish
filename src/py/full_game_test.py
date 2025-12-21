@@ -13,7 +13,7 @@ ENGINE_PATH = r"C:/Learn/LearnRust/chess/target/release/test_best_move.exe"
 # ==================================================
 # CONFIG
 # ==================================================
-STOCKFISH_ELO = 1800
+STOCKFISH_ELO = 1600
 STOCKFISH_DEPTH = 10
 ENGINE_PLAYS_WHITE = True
 MOVE_DELAY_SEC = 0.2

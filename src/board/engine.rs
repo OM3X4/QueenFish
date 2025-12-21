@@ -183,17 +183,17 @@ impl Board {
     pub fn pieces_score(&self) -> i32 {
         let bbs = &self.bitboards.0;
 
-        let white = bbs[0].0.count_ones() as i32 * 1   // pawn
-        + bbs[1].0.count_ones() as i32 * 3   // knight
-        + bbs[2].0.count_ones() as i32 * 3   // bishop
-        + bbs[3].0.count_ones() as i32 * 5   // rook
-        + bbs[4].0.count_ones() as i32 * 9; // queen
+        let white = bbs[0].0.count_ones() as i32 * 100   // pawn
+        + bbs[1].0.count_ones() as i32 * 300   // knight
+        + bbs[2].0.count_ones() as i32 * 300   // bishop
+        + bbs[3].0.count_ones() as i32 * 500   // rook
+        + bbs[4].0.count_ones() as i32 * 900; // queen
 
-        let black = bbs[6].0.count_ones() as i32 * 1
-            + bbs[7].0.count_ones() as i32 * 3
-            + bbs[8].0.count_ones() as i32 * 3
-            + bbs[9].0.count_ones() as i32 * 5
-            + bbs[10].0.count_ones() as i32 * 9;
+        let black = bbs[6].0.count_ones() as i32 * 100
+            + bbs[7].0.count_ones() as i32 * 300
+            + bbs[8].0.count_ones() as i32 * 300
+            + bbs[9].0.count_ones() as i32 * 500
+            + bbs[10].0.count_ones() as i32 * 900;
 
         white - black
     } //
@@ -207,7 +207,7 @@ impl Board {
             | self.bitboards.0[PieceType::WhiteKnight.piece_index()].0)
             & RANK_1;
 
-        black.count_ones() as i32 - white.count_ones() as i32
+        (black.count_ones() as i32 - white.count_ones() as i32) * 10
     } //
 
     pub fn double_rook_bonus(&self) -> f32 {
@@ -234,7 +234,9 @@ impl Board {
         let score = self.pieces_score();
         // score += self.development_score();
 
-        return score;
+
+        // It returns score relative to the side to play (by default it is white)
+        return if self.turn == Turn::WHITE { score } else { -score };
     } //
 
     #[inline(always)]
@@ -326,7 +328,7 @@ impl Board {
         depth: i32,
         max_depth: i32,
         mut alpha: i32,
-        mut beta: i32,
+        beta: i32,
         tt: &mut TranspositionTable,
     ) -> i32 {
         NODE_COUNT.fetch_add(1, Ordering::Relaxed);
@@ -335,18 +337,14 @@ impl Board {
         //     dbg!("Nodes: {}", NODE_COUNT.load(Ordering::Relaxed));
         // }
 
-        let remaining_depth = (max_depth - depth) as i8;
-
         // 1. TT LOOKUP
         // if let Some(score) = tt.get(self.hash, remaining_depth) {
         //     return score;
         // }
 
         // 2. BASE CASE (Optimized)
-        // We stop here. We do NOT generate moves.
         if depth >= max_depth {
             let score = self.evaluate();
-            // Optional: Store static eval in TT if you want, though usually we cache search results
             // tt.put(self.hash, remaining_depth, score);
             return score;
         }
@@ -361,84 +359,41 @@ impl Board {
 
         let mut found_legal = false;
 
-        match self.turn {
-            Turn::WHITE => {
-                let mut best_score = i32::MIN;
+        let mut best_score = -30_000;
 
-                for mv in iter {
-                    let unmake_move = self.make_move(*mv);
+        for mv in iter {
+            let unmake_move = self.make_move(*mv);
 
-                    // Filter illegal moves
-                    if self.is_king_in_check(self.opposite_turn()) {
-                        self.unmake_move(unmake_move);
-                        continue;
-                    }
-
-                    found_legal = true;
-
-                    // RECURSE
-                    let score = self.alpha_beta(depth + 1, max_depth, alpha, beta, tt);
-
-                    self.unmake_move(unmake_move);
-
-                    best_score = best_score.max(score);
-                    alpha = alpha.max(best_score);
-
-                    if alpha >= beta {
-                        break; // Beta Cutoff
-                    }
-                }
-
-                // 4. CHECKMATE / STALEMATE (Internal Nodes Only)
-                if !found_legal {
-                    if self.is_king_in_check(self.turn) {
-                        return i32::MIN + depth; // Checkmate (White loses)
-                    } else {
-                        return 0; // Stalemate
-                    }
-                };
-
-                // tt.put(self.hash, remaining_depth, best_score);
-                return best_score;
+            // Filter illegal moves
+            if self.is_king_in_check(self.opposite_turn()) {
+                self.unmake_move(unmake_move);
+                continue;
             }
 
-            Turn::BLACK => {
-                let mut best_score = i32::MAX;
+            found_legal = true;
 
-                for mv in iter {
-                    let unmake_move = self.make_move(*mv);
+            let score = -self.alpha_beta(depth + 1, max_depth, -beta, -alpha, tt);
 
-                    if self.is_king_in_check(self.opposite_turn()) {
-                        self.unmake_move(unmake_move);
-                        continue;
-                    }
+            self.unmake_move(unmake_move);
 
-                    found_legal = true;
+            best_score = best_score.max(score);
+            alpha = alpha.max(best_score);
 
-                    let score = self.alpha_beta(depth + 1, max_depth, alpha, beta, tt);
-
-                    self.unmake_move(unmake_move);
-
-                    best_score = best_score.min(score);
-                    beta = beta.min(best_score);
-
-                    if alpha >= beta {
-                        break; // Alpha Cutoff
-                    }
-                }
-
-                if !found_legal {
-                    if self.is_king_in_check(self.turn) {
-                        return i32::MAX - depth; // Checkmate (Black loses)
-                    } else {
-                        return 0; // Stalemate
-                    }
-                };
-
-                // tt.put(self.hash, remaining_depth, best_score);
-                return best_score;
+            if alpha >= beta {
+                break; // Alpha Cutoff
             }
-        }
+        };
+
+        if !found_legal {
+            if self.is_king_in_check(self.turn) {
+                let mate = 30_000;
+                return -mate + depth;
+            } else {
+                return 0; // Stalemate
+            }
+        };
+
+        return best_score;
     } //
 
     pub fn engine_singlethread(&mut self, max_depth: i32) -> Move {
@@ -450,34 +405,34 @@ impl Board {
         for mv in &moves {
             let unmake_move = self.make_move(*mv);
 
-            let mut score =
-                self.alpha_beta(0, 4, i32::MIN, i32::MAX, &mut TranspositionTable::new(20));
+            let score =
+                -self.alpha_beta(0, 4, -30_000, 30_000, &mut TranspositionTable::new(20));
 
-            if self.turn == Turn::WHITE {
-                score = -score;
-            };
+            // if self.turn == Turn::WHITE {
+            //     score = -score;
+            // };
 
             scored.push((score, *mv));
 
             self.unmake_move(unmake_move);
-        }
+        };
 
         scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
 
         moves = scored.iter().map(|mv| mv.1).collect();
 
-        let mut best_score = i32::MIN;
+        let mut best_score = -30_000;
         let mut best_move = moves[0];
         let mut tt = TranspositionTable::new(20);
 
         for mv in &moves {
             let unmake_move = self.make_move(*mv);
 
-            let mut score = self.alpha_beta(0, max_depth, i32::MIN, i32::MAX, &mut tt);
+            let score = -self.alpha_beta(0, max_depth, -30_000, 30_000, &mut tt);
 
-            if self.turn == Turn::WHITE {
-                score = -score;
-            }
+            // if self.turn == Turn::WHITE {
+            //     score = -score;
+            // }
 
             if score > best_score {
                 best_score = score;
@@ -485,7 +440,7 @@ impl Board {
             }
 
             self.unmake_move(unmake_move);
-        }
+        };
 
         dbg!(NODE_COUNT.load(Ordering::Relaxed));
         return best_move;
@@ -502,7 +457,7 @@ impl Board {
             let unmake_move = self.make_move(*mv);
 
             let mut score =
-                self.alpha_beta(0, 4, i32::MIN, i32::MAX, &mut TranspositionTable::new(20));
+                -self.alpha_beta(0, 4, -30_000, 30_000, &mut TranspositionTable::new(20));
 
             if self.turn == Turn::WHITE {
                 score = -score;
@@ -517,7 +472,7 @@ impl Board {
 
         moves = scored.iter().map(|mv| mv.1).collect();
 
-        let best = Arc::new(Mutex::new((i32::MIN, moves[0])));
+        let best = Arc::new(Mutex::new((-30_000, moves[0])));
 
         let threads = number_of_threads as usize;
         let chunk_size = (moves.len() + threads - 1) / threads;
@@ -536,7 +491,7 @@ impl Board {
                 for mv in chunck {
                     let unmake_move = board.make_move(mv);
 
-                    let mut score = board.alpha_beta(0, max_depth, i32::MIN, i32::MAX, &mut tt);
+                    let mut score = -board.alpha_beta(0, max_depth, -30_000, 30_000, &mut tt);
 
                     if board.turn == Turn::WHITE {
                         score = -score;
@@ -563,8 +518,6 @@ impl Board {
     } //
 
     pub fn engine(&mut self, max_depth: i32, threads: i32) -> Move {
-
-
         if let Some(uci) = self.get_random_opening_move() {
             let bytes = uci.as_bytes();
 
@@ -650,7 +603,7 @@ mod test {
         init_rook_magics();
 
         let mut board = Board::new();
-        board.load_from_fen("r3k1nr/pp1bbppp/1qn5/2pp4/Q7/P5P1/1PPP1PBP/RNB1K1NR w");
+        board.load_from_fen("r1bqk2r/ppppbppp/2n2n2/4p3/N3P3/3B1N2/PPPP1PPP/R1BQK2R w");
 
         let best_move = board.engine(8, 1);
 
