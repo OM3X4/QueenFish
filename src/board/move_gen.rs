@@ -577,27 +577,3 @@ impl Board {
         self.occupied = unmake_move.occupied;
     } //
 } //
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test() {
-        let mut board = Board::new();
-        board.load_from_fen("1rbk1bnr/pp3ppp/1Pp1p3/3p1P2/5N1q/2NQ2P1/1PP1P2P/R1B1KB1R w");
-        // board.load_from_fen("1rbk1bnr/pp3ppp/1Pp1p3/3Q1P2/5N1q/2N3P1/1PP1P2P/R1B1KB1R w");
-
-        let moves = board.generate_moves();
-        for mv in moves {
-            // println!("{:?} , {:?}", mv.from , mv.to);
-        }
-    } //
-
-    #[test]
-    fn test_rook_magic() {
-        let mut board = Board::new();
-        board.load_from_fen("1rbk1bnr/pp3ppp/1Pp1p3/3p1P2/5N1q/2NQ2P1/1PP1P2P/R1B1KB1R w");
-        let attacks = rook_attacks(0, board.occupied.0);
-    }
-}

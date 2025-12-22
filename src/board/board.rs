@@ -284,16 +284,3 @@ impl Board {
     } //
 } //
 
-mod test {
-
-    #[test]
-    fn check_mate() {
-        use super::{Board, GameState};
-
-        let mut board = Board::new();
-        board.load_from_fen("rnbqkbnr/pppppQpp/8/8/2B5/8/PPPPPPPP/RNB1K1NR b");
-
-        assert_eq!(board.get_game_state(), GameState::CheckMate);
-        // assert_eq!(board.is_check_mate(), true);
-    }
-}

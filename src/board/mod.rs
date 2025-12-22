@@ -5,6 +5,7 @@ mod engine;
 pub mod move_gen;
 pub mod rook_magic;
 mod zobrist;
+mod test;
 
 pub use board::Board;
 
@@ -71,7 +72,7 @@ impl PieceType {
     }
 }
 
-#[derive(Copy, Clone, Debug , PartialEq, Eq)]
+#[derive(Copy, Clone, Debug , PartialEq, Eq , Hash)]
 #[repr(transparent)]
 pub struct Move(u32);
 

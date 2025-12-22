@@ -87,6 +87,7 @@ def engine_move(board: chess.Board):
 # ==================================================
 def play_game():
     board = chess.Board()
+    board.set_castling_fen("")
 
     # ---------- PGN SETUP ----------
     game = chess.pgn.Game()
@@ -151,10 +152,6 @@ def play_game():
         print("Result:", board.result())
         print("\n=== PGN ===\n")
         print(game)
-
-        # Optional: save PGN
-        with open("game.pgn", "w") as f:
-            print(game, file=f)
 
 # ==================================================
 # BUILD ENGINE
