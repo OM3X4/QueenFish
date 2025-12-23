@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 fn main() {
     use bishop_magic::init_bishop_magics;
     use chess::board::*;
@@ -18,7 +20,7 @@ fn main() {
 
     // dbg!(board.turn);
     let start = std::time::Instant::now();
-    let best_move = board.engine(12 , 1 , true , true);
+    let best_move = board.engine(64 , 1 , true , true , Duration::from_secs(10));
     dbg!(start.elapsed());
     // let best_move_1 = board.engine(6 , 1 , true , false);
     // dbg!(best_move_1.to_uci());

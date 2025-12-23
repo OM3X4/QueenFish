@@ -82,8 +82,63 @@ def stockfish_top5(board: chess.Board, engine, time_sec=3):
     # Keep top 5
     return [
         (move.from_square, move.to_square)
-        for _, move in scored_moves[:5]
+        for _, move in scored_moves[:3]
     ]
+
+def stockfish_top_near_moves(
+    board: chess.Board,
+    engine,
+    time_sec=3,
+    max_moves=5,
+    threshold_cp=30,  # <-- 0.30 pawn window
+):
+    infos = engine.analyse(
+        board,
+        chess.engine.Limit(time=time_sec),
+        multipv=10
+    )
+
+    scored_moves = []
+
+    for info in infos:
+        pv = info.get("pv")
+        score = info.get("score")
+
+        if not pv or score is None:
+            continue
+
+        move = pv[0]
+
+        # Enforce constraints
+        if move.promotion is not None:
+            continue
+        if board.is_castling(move):
+            continue
+        if board.is_en_passant(move):
+            continue
+
+        eval_cp = score.pov(board.turn).score(mate_score=10_000)
+        if eval_cp is None:
+            continue
+
+        scored_moves.append((eval_cp, move))
+
+    if not scored_moves:
+        return []
+
+    # Sort best first
+    scored_moves.sort(reverse=True, key=lambda x: x[0])
+
+    best_eval = scored_moves[0][0]
+
+    # Keep moves close to best evaluation
+    near_moves = [
+        (mv.from_square, mv.to_square)
+        for eval_cp, mv in scored_moves
+        if best_eval - eval_cp <= threshold_cp
+    ]
+
+    return near_moves[:max_moves]
 
 
 
@@ -109,7 +164,7 @@ with chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH) as sf:
         fen = safe_random_fen()
         board = chess.Board(fen)
 
-        top5 = stockfish_top5(board, sf, time_sec=3)
+        top5 = stockfish_top_near_moves(board, sf)
 
         minimal_fen = fen.split(" ")[0:2]
 

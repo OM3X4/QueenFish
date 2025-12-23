@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use crate::board::constants::{RANK_1, RANK_8};
 
-use super::constants::{FILES, MVV_LVA, get_book_moves};
+use super::constants::{MVV_LVA, get_book_moves};
 use super::zobrist::{Z_PIECE, Z_SIDE};
 use super::{Board, Bound, GameState, Move, PieceType, TTEntry, TranspositionTable, Turn};
 
@@ -77,7 +77,7 @@ impl TranspositionTable {
             _ => {}
         }
     } //
-}
+} //
 
 fn partition_by_bool<T>(v: &mut [T], pred: impl Fn(&T) -> bool) {
     let mut left = 0;
@@ -235,39 +235,23 @@ impl Board {
 
     #[inline(always)]
     pub fn development_score(&self) -> i32 {
-        let black = (self.bitboards.0[PieceType::BlackBishop.piece_index()].0
+        let black_undeveloped = (self.bitboards.0[PieceType::BlackBishop.piece_index()].0
             | self.bitboards.0[PieceType::BlackKnight.piece_index()].0)
             & RANK_8;
-        let white = (self.bitboards.0[PieceType::WhiteBishop.piece_index()].0
+
+        let white_undeveloped = (self.bitboards.0[PieceType::WhiteBishop.piece_index()].0
             | self.bitboards.0[PieceType::WhiteKnight.piece_index()].0)
             & RANK_1;
 
-        (black.count_ones() as i32 - white.count_ones() as i32) * 10
-    } //
+        let black_penalty = black_undeveloped.count_ones() as i32 * 10;
+        let white_penalty = white_undeveloped.count_ones() as i32 * 10;
 
-    pub fn double_rook_bonus(&self) -> f32 {
-        let mut bonus: f32 = 0.0;
-
-        for file in FILES {
-            let white_rooks_on_file =
-                ((self.bitboards.0[PieceType::WhiteRook.piece_index()]).0 & file).count_ones();
-            let black_rooks_on_file =
-                ((self.bitboards.0[PieceType::BlackRook.piece_index()]).0 & file).count_ones();
-
-            if white_rooks_on_file >= 2 {
-                bonus += 0.5;
-            }
-            if black_rooks_on_file >= 2 {
-                bonus -= 0.5;
-            }
-        }
-
-        bonus
-    } //
+        white_penalty - black_penalty
+    }
 
     pub fn evaluate(&mut self) -> i32 {
-        let score = self.pieces_score();
-        // score += self.development_score();
+        let mut score = self.pieces_score();
+        score += self.development_score();
 
         // It returns score relative to the side to play (by default it is white)
         return if self.turn == Turn::WHITE {
@@ -620,6 +604,7 @@ impl Board {
         threads: i32,
         is_tt: bool,
         is_null_move_pruning: bool,
+        maximum_time: std::time::Duration,
     ) -> Move {
         if let Some(uci) = self.get_random_opening_move() {
             let bytes = uci.as_bytes();
@@ -648,12 +633,7 @@ impl Board {
         if threads > 1 {
             self.engine_multithreaded(max_depth, threads)
         } else {
-            self.engine_singlethread(
-                max_depth,
-                is_tt,
-                is_null_move_pruning,
-                Duration::from_secs(15),
-            )
+            self.engine_singlethread(max_depth, is_tt, is_null_move_pruning, maximum_time)
         }
     } //
 
@@ -692,3 +672,20 @@ impl Board {
     } //
 }
 
+mod test {
+    use crate::board::board;
+
+    #[test]
+    fn test() {
+        let mut board = board::Board::new();
+        board.load_from_fen("rnb1kb1r/ppp2ppp/5n2/3qp3/8/2P2N2/PP1P1PPP/RNBQKB1R w");
+
+        let start = std::time::Instant::now();
+        dbg!(
+            board
+                .engine(64, 1, true, true, std::time::Duration::from_secs(200))
+                .to_uci()
+        );
+        dbg!(start.elapsed());
+    }
+}

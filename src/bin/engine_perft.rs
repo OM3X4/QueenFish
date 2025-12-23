@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 fn main() {
     use chess::board::*;
     let depth = 12;
@@ -57,7 +59,7 @@ fn main() {
         println!("-------------------------------------------------");
         println!("Single Threaded Engine:");
         let start = std::time::Instant::now();
-        let best_move = board.engine(depth , 1 , is_tt , is_null_move_pruning);
+        let best_move = board.engine(depth , 1 , is_tt , is_null_move_pruning , Duration::from_secs(15));
         println!("Time taken: {:?}", start.elapsed());
         println!("Best Move: {}", best_move.to_uci());
         println!("-------------------------------------------------\n");

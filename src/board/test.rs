@@ -23,17 +23,17 @@ pub fn random_fen(min_moves: usize, max_moves: usize) -> Fen {
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashSet;
+    use std::{collections::HashSet, time::Duration};
 
     use crate::board::Board as MyEngine;
-    use shakmaty::{Chess, Position};
-    use crate::board::rook_magic::init_rook_magics;
     use crate::board::bishop_magic::init_bishop_magics;
+    use crate::board::rook_magic::init_rook_magics;
+    use shakmaty::{Chess, Position};
+    use stockfish::{Stockfish};
 
 
     #[test]
     fn move_generation() {
-
         init_rook_magics();
         init_bishop_magics();
 
@@ -94,10 +94,116 @@ mod test {
                 println!("❌ {} {}", counter, fen_string);
                 println!("Missed : {:?}", missed);
                 println!("Extra : {:?}", my_moves);
-                println!("Moves : {:#?}", board.generate_moves().iter().map(|mv| (mv.from() , mv.to())).collect::<Vec<(u8, u8)>>());
+                println!(
+                    "Moves : {:#?}",
+                    board
+                        .generate_moves()
+                        .iter()
+                        .map(|mv| (mv.from(), mv.to()))
+                        .collect::<Vec<(u8, u8)>>()
+                );
                 break;
             }
             counter += 1;
         }
+    } //
+
+    #[test]
+    fn best_move_test() {
+        init_rook_magics();
+        init_bishop_magics();
+
+
+        let mut counter = 0;
+        let mut missed = 0;
+
+        while counter < 100 {
+
+            let mut sf = Stockfish::new("C:/Program Files/stockfish/stockfish-windows-x86-64-avx2.exe").unwrap();
+
+            let fen = super::random_fen(4, 20);
+            let fen_string = fen.to_string()
+                    .split_whitespace()
+                    .take(2)
+                    .fold(String::new(), |mut acc, w| {
+                        if !acc.is_empty() {
+                            acc.push(' ');
+                        }
+                        acc.push_str(w);
+                        acc
+                    });
+
+
+            let mut board = MyEngine::new();
+            board.load_from_fen(&fen_string);
+
+            sf.set_fen_position(&fen.to_string()).unwrap();
+
+            sf.set_depth(22);
+            let output = sf.go().unwrap();
+            let best_move_sf = output.best_move();
+            sf.play_move(&best_move_sf).unwrap();
+            let eval = sf.go().unwrap().eval().value();
+
+            let start = std::time::Instant::now();
+            let best_move_by_engine = board.engine(16, 1, true, true , Duration::from_secs(6)).to_uci();
+            dbg!(start.elapsed());
+
+            sf.set_fen_position(&fen.to_string()).unwrap();
+            sf.play_move(&best_move_by_engine).unwrap();
+            let engine_eval = sf.go().unwrap().eval().value();
+
+            dbg!(&fen_string);
+            dbg!(best_move_sf);
+            dbg!(&best_move_by_engine);
+
+            counter += 1;
+            if (eval - engine_eval).abs() > 100 {
+                missed += 1;
+                println!("❌ {}", &fen_string);
+                println!("Expected : {}", best_move_sf);
+                println!("Got : {}", best_move_by_engine);
+                println!("Engine eval : {}", engine_eval);
+                println!("Stockfish eval : {}", eval);
+                println!("\n\n");
+            } else {
+                println!("Expected : {}", best_move_sf);
+                println!("Got : {}", best_move_by_engine);
+                println!("Engine eval : {}", engine_eval);
+                println!("Stockfish eval : {}", eval);
+                println!("\n\n");
+            }
+
+
+
+        }
+
+
+        println!("Report: {} games tested, {} games missed", counter, missed);
+
     }//
+
+    #[test]
+    fn evaluating_sanity_check() {
+        let mut board = MyEngine::new();
+
+
+        // Starting Position eval must be zero
+        board.load_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w");
+        assert_eq!(board.evaluate(), 0);
+
+        // White up a pawn (white to move)
+        board.load_from_fen("rnbqkbnr/pppp1ppp/8/8/8/8/PPPPPPPP/RNBQKBNR w");
+        assert_eq!(board.evaluate(), 100);
+
+        // White up a pawn (black to move)
+        board.load_from_fen("rnbqkbnr/pppp1ppp/8/8/8/8/PPPPPPPP/RNBQKBNR b");
+        assert_eq!(board.evaluate(), -100);
+
+
+
+
+
+
+    }
 }

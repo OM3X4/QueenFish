@@ -16,6 +16,7 @@ tracing-subscriber = "0.3.22"
 smallvec = "1.13"
 uci = "0.2.3"
 shakmaty = "0.29.4"
+stockfish = "0.2.11"
 
 [profile.test]
 opt-level = 3
