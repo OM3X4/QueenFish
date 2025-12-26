@@ -254,7 +254,6 @@ impl Board {
         score += self.development_score();
 
         return score;
-
     } //
 
     #[inline(always)]
@@ -456,85 +455,6 @@ impl Board {
         return best_stable_move;
     } //
 
-    pub fn engine_multithreaded(&mut self, max_depth: i32, number_of_threads: i32) -> Move {
-        let start_time = std::time::Instant::now();
-        let mut moves = self.generate_moves();
-        partition_by_bool(&mut moves, |mv| mv.is_capture());
-
-        let mut scored: Vec<(i32, Move)> = Vec::new();
-
-        for mv in &moves {
-            let unmake_move = self.make_move(*mv);
-
-            let mut score = -self.alpha_beta(
-                0,
-                4,
-                -30_000,
-                30_000,
-                &mut TranspositionTable::new(20),
-                false,
-                false,
-            );
-
-            if self.turn == Turn::WHITE {
-                score = -score;
-            };
-
-            scored.push((score, *mv));
-
-            self.unmake_move(unmake_move);
-        }
-
-        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-
-        moves = scored.iter().map(|mv| mv.1).collect();
-
-        let best = Arc::new(Mutex::new((-30_000, moves[0])));
-
-        let threads = number_of_threads as usize;
-        let chunk_size = (moves.len() + threads - 1) / threads;
-
-        let mut handles = Vec::new();
-
-        for chunck in moves.chunks(chunk_size) {
-            let mut board = self.clone();
-            let best = Arc::clone(&best);
-            let mut chunck = chunck.to_vec();
-            partition_by_bool(&mut chunck, |mv| mv.is_capture());
-
-            handles.push(thread::spawn(move || {
-                let mut tt = TranspositionTable::new(20);
-
-                for mv in chunck {
-                    let unmake_move = board.make_move(mv);
-
-                    let mut score =
-                        -board.alpha_beta(0, max_depth, -30_000, 30_000, &mut tt, false, false);
-
-                    if board.turn == Turn::WHITE {
-                        score = -score;
-                    }
-
-                    let mut best = best.lock().unwrap();
-                    if score > best.0 {
-                        *best = (score, mv);
-                    }
-
-                    board.unmake_move(unmake_move);
-                }
-            }));
-        }
-
-        for handle in handles {
-            handle.join().unwrap();
-        }
-
-        dbg!(start_time.elapsed().as_millis());
-        dbg!(NODE_COUNT.load(Ordering::Relaxed));
-
-        return best.lock().unwrap().1.clone();
-    } //
-
     pub fn engine(
         &mut self,
         max_depth: i32,
@@ -564,14 +484,10 @@ impl Board {
 
             dbg!("Opening book move: {}", uci);
 
-            return Move::new(from, to, piece, capture , false , false , false);
+            return Move::new(from, to, piece, capture, false, false, false);
         };
 
-        if threads > 1 {
-            self.engine_multithreaded(max_depth, threads)
-        } else {
-            self.engine_singlethread(max_depth, is_tt, is_null_move_pruning, maximum_time)
-        }
+        self.engine_singlethread(max_depth, is_tt, is_null_move_pruning, maximum_time)
     } //
 
     pub fn perft(&mut self, depth: i32, max_depth: i32) -> i64 {
@@ -596,7 +512,7 @@ impl Board {
             self.unmake_move(unmake);
 
             if depth == 0 {
-                println!("{} {}" , mv.to_uci() , inner_nodes);
+                println!("{} {}", mv.to_uci(), inner_nodes);
             }
 
             nodes += inner_nodes;
@@ -799,5 +715,5 @@ mod test {
 
             println!("\n\n\n");
         }
-    }//
+    } //
 }
