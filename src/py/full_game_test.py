@@ -147,6 +147,9 @@ def play_game():
     board = chess.Board()
     board.set_castling_fen("")
 
+    fens_to_moves = {}
+
+
     # ---------- PGN SETUP ----------
     game = chess.pgn.Game()
     game.headers["Event"] = "Engine vs Stockfish"
@@ -175,6 +178,9 @@ def play_game():
                (board.turn == chess.BLACK and not ENGINE_PLAYS_WHITE):
 
                 top_5 = stockfish_top_near_moves(board, sf)
+
+                fens_to_moves[board.fen()] = top_5
+
 
                 mv = engine_move(board)
                 print(f"\nEngine plays: {mv.uci()}")
@@ -210,6 +216,8 @@ def play_game():
         print("Result:", board.result())
         print("\n=== PGN ===\n")
         print(game)
+        print("\n=== FENS TO MOVES ===")
+        print(fens_to_moves)
 
 # ==================================================
 # BUILD ENGINE

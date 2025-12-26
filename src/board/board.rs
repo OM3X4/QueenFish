@@ -10,6 +10,8 @@ pub struct Board {
     pub piece_at: [Option<PieceType>; 64],
     pub occupied: BitBoard,
     pub hash: u64,
+    pub en_passant: Option<u8>,
+    pub castling: u8,
 }
 
 impl Board {
@@ -20,6 +22,8 @@ impl Board {
             piece_at: [None; 64],
             hash: 0,
             occupied: BitBoard(RANK_1 | RANK_2 | RANK_7 | RANK_8),
+            en_passant: None,
+            castling: 15,
         };
 
         board.piece_at = board.generate_piece_at();
@@ -34,6 +38,8 @@ impl Board {
         self.piece_at = self.generate_piece_at();
         self.occupied = BitBoard(RANK_1 | RANK_2 | RANK_7 | RANK_8);
         self.turn = Turn::WHITE;
+        self.en_passant = None;
+        self.castling = 15;
     } //
     pub fn reset_to_zero(&mut self) {
         self.bitboards = BitBoards::zero();
@@ -41,6 +47,8 @@ impl Board {
         self.piece_at = [None; 64];
         self.hash = self.compute_hash();
         self.turn = Turn::WHITE;
+        self.en_passant = None;
+        self.castling = 0;
     } //
     pub fn get_all_white_bits(&self) -> BitBoard {
         return BitBoard(
@@ -63,9 +71,7 @@ impl Board {
         );
     } //
     pub fn get_all_bits(&self) -> BitBoard {
-        return BitBoard(
-            self.get_all_white_bits().0 | self.get_all_black_bits().0
-        );
+        return BitBoard(self.get_all_white_bits().0 | self.get_all_black_bits().0);
     } //
 
     pub fn piece_at(&self, square: u64) -> Option<PieceType> {
@@ -132,11 +138,52 @@ impl Board {
     pub fn load_from_fen(&mut self, fen: &str) {
         self.reset_to_zero();
 
-        let (position, turn) = fen.split_once(' ').unwrap();
-        self.turn = if turn == "w" {
-            Turn::WHITE
-        } else {
-            Turn::BLACK
+        // let (position, turn) = fen.split_once(' ').unwrap();
+
+        let splitted = fen.split_ascii_whitespace().collect::<Vec<_>>();
+
+        if splitted.len() < 2 {
+            panic!("Invalid FEN");
+        }
+
+        let position = splitted[0];
+        let turn = splitted[1];
+
+        if let Some(castling) = splitted.get(2) {
+            if castling != &"-" {
+                if castling.contains('K') {
+                    self.castling |= 0b0001;
+                }
+                if castling.contains('Q') {
+                    self.castling |= 0b0010;
+                }
+                if castling.contains('k') {
+                    self.castling |= 0b0100;
+                }
+                if castling.contains('q') {
+                    self.castling |= 0b1000;
+                }
+            }
+
+            if let Some(en_passant) = splitted.get(3) {
+                if en_passant != &"-" {
+                    let bytes = en_passant.as_bytes();
+                    let file = bytes[0] - b'a'; // 'a'..'h' -> 0..7
+                    let rank = bytes[1] - b'1'; // '1'..'8' -> 0..7
+
+                    if rank == 2 || rank == 5 {
+                        self.en_passant = Some(rank * 8 + file);
+                    } else {
+                        self.en_passant = None; // invalid FEN safety
+                    }
+                }
+            }
+        }
+
+        self.turn = match turn {
+            "w" => Turn::WHITE,
+            "b" => Turn::BLACK,
+            _ => panic!("Invalid side to move"),
         };
 
         let rows: Vec<&str> = position.split('/').collect();
@@ -240,6 +287,32 @@ impl Board {
             Turn::BLACK => 'b',
         });
 
+        fen.push(' ');
+        if self.castling != 0 {
+            if self.castling & 0b0001 != 0 {
+                fen.push('K');
+            }
+            if self.castling & 0b0010 != 0 {
+                fen.push('Q');
+            }
+            if self.castling & 0b0100 != 0 {
+                fen.push('k');
+            }
+            if self.castling & 0b1000 != 0 {
+                fen.push('q');
+            }
+        } else {
+            fen.push('-');
+        }
+
+        fen.push(' ');
+        if let Some(en_passant) = self.en_passant {
+            let file = en_passant % 8;
+            let rank = en_passant / 8;
+            fen.push((b'a' + file as u8) as char);
+            fen.push((b'1' + rank as u8) as char);
+        }
+
         fen
     } //
 
@@ -283,4 +356,3 @@ impl Board {
         };
     } //
 } //
-

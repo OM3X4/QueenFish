@@ -1,6 +1,6 @@
 use rand::prelude::IndexedRandom;
 use smallvec::SmallVec;
-use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread; // Import the trait for random selection
@@ -10,7 +10,7 @@ use crate::board::constants::{RANK_1, RANK_8};
 
 use super::constants::{MVV_LVA, get_book_moves};
 use super::zobrist::{Z_PIECE, Z_SIDE};
-use super::{Board, Bound, GameState, Move, PieceType, TTEntry, TranspositionTable, Turn};
+use super::{Board, Bound, Move, PieceType, TTEntry, TranspositionTable, Turn};
 
 static NODE_COUNT: AtomicU64 = AtomicU64::new(0);
 static SKIP_COUNT: AtomicU64 = AtomicU64::new(0);
@@ -253,12 +253,8 @@ impl Board {
         let mut score = self.pieces_score();
         score += self.development_score();
 
-        // It returns score relative to the side to play (by default it is white)
-        return if self.turn == Turn::WHITE {
-            score
-        } else {
-            -score
-        };
+        return score;
+
     } //
 
     #[inline(always)]
@@ -284,65 +280,6 @@ impl Board {
         });
 
         // Quiet moves stay untouched
-    } //
-
-    //currently only play for white
-    pub fn minimax(&mut self, depth: i32, moves_map: &mut HashMap<u64, (i32, i32)>) -> i32 {
-        let game_state = self.get_game_state();
-        if game_state == GameState::CheckMate {
-            match self.turn {
-                Turn::WHITE => return i32::MIN + depth,
-                Turn::BLACK => return i32::MAX - depth,
-            }
-        } else if game_state == GameState::StaleMate {
-            return 0;
-        }
-
-        if depth >= 4 {
-            return self.evaluate();
-        }
-
-        let moves: Vec<Move>;
-        if let Some((score, stored_depth)) = moves_map.get(&self.hash) {
-            if *stored_depth > depth {
-                return *score;
-            }
-        }
-        let moves = self.generate_moves();
-        match self.turn {
-            Turn::WHITE => {
-                let mut best_score = i32::MIN;
-                for mv in moves {
-                    let unmake_move = self.make_move(mv);
-
-                    let score = self.minimax(depth + 1, moves_map);
-
-                    self.unmake_move(unmake_move);
-
-                    if score > best_score {
-                        best_score = score;
-                    }
-                }
-                moves_map.insert(self.hash, (best_score, depth));
-                return best_score;
-            } //
-            Turn::BLACK => {
-                let mut best_score = i32::MAX;
-                for mv in moves {
-                    let unmake_move = self.make_move(mv);
-
-                    let score = self.minimax(depth + 1, moves_map);
-
-                    self.unmake_move(unmake_move);
-
-                    if score < best_score {
-                        best_score = score;
-                    }
-                }
-                moves_map.insert(self.hash, (best_score, depth));
-                return best_score;
-            } //
-        } //
     } //
 
     pub fn alpha_beta(
@@ -627,7 +564,7 @@ impl Board {
 
             dbg!("Opening book move: {}", uci);
 
-            return Move::new(from, to, piece, capture);
+            return Move::new(from, to, piece, capture , false , false , false);
         };
 
         if threads > 1 {
@@ -642,8 +579,11 @@ impl Board {
             return 1;
         }
 
-        let mut moves = SmallVec::new();
-        self.generate_pesudo_moves(&mut moves);
+
+        // println!("{} || {} , {}", self.to_fen() , depth, self.generate_moves().len());
+        // let fen = shakmaty::fen::Fen::from_str(&self.to_fen()).unwrap();
+        // let fen =
+        let mut moves = self.generate_moves();
 
         // println!("{} || {} , {}", self.to_fen() , depth, moves.len());
 
@@ -653,19 +593,48 @@ impl Board {
 
         let mut nodes = 0;
 
+        // if depth == 0 {
+        //     let mv = moves[0];
+        //     let unmake = self.make_move(mv);
+        //     nodes += self.perft(depth + 1, max_depth);
+        //     self.unmake_move(unmake);
+
+        //     return nodes;
+        // }
+
+        // moves.sort_by(|a , b| a.to_uci().cmp(&b.to_uci()));
+
         for mv in moves {
             // let before = self.clone();
+            // let bitboards = self.bitboards.clone();
+            // let old_fen = self.to_fen();
             let unmake = self.make_move(mv);
 
-            if self.is_king_in_check(self.opposite_turn()) {
-                self.unmake_move(unmake);
-                continue;
-            }
+            // let position_after_move = self.to_fen();
 
-            nodes += self.perft(depth + 1, max_depth);
+            let inner_nodes = self.perft(depth + 1, max_depth);
 
             self.unmake_move(unmake);
-            // assert_eq!(*self, before);
+
+            if depth == 0 {
+                println!("{} {}" , mv.to_uci() , inner_nodes);
+            }
+
+            nodes += inner_nodes;
+
+            // if *self != before {
+            //     dbg!(&old_fen);
+            //     // dbg!(&position_after_move);
+            //     dbg!(self.to_fen());
+            //     panic!();
+            // }
+            // assert_eq!(self.bitboards, before.bitboards);
+            // assert_eq!(self.turn, before.turn);
+            // assert_eq!(self.piece_at, before.piece_at);
+            // assert_eq!(self.castling, before.castling);
+            // assert_eq!(self.en_passant, before.en_passant);
+            // assert_eq!(self.occupied, before.occupied);
+            // assert_eq!(self.hash, before.hash);
         }
 
         nodes
@@ -673,19 +642,197 @@ impl Board {
 }
 
 mod test {
+    use std::collections::HashMap;
+
     use crate::board::board;
 
     #[test]
     fn test() {
+        use crate::board::bishop_magic::init_bishop_magics;
+        use crate::board::rook_magic::init_rook_magics;
+
+        init_rook_magics();
+        init_bishop_magics();
+
         let mut board = board::Board::new();
-        board.load_from_fen("rnb1kb1r/ppp2ppp/5n2/3qp3/8/2P2N2/PP1P1PPP/RNBQKB1R w");
+        board.load_from_fen("5r1k/p5p1/1pp2r1p/4N3/P7/RQ1PpP1P/1P5q/5K2 w");
 
         let start = std::time::Instant::now();
+        // dbg!(
+        //     board
+        //         .generate_moves()
+        //         .iter()
+        //         .map(|mv| mv.to_uci())
+        //         .collect::<Vec<String>>()
+        // );
         dbg!(
             board
-                .engine(64, 1, true, true, std::time::Duration::from_secs(200))
+                .engine(8, 1, false, false, std::time::Duration::from_secs(10))
                 .to_uci()
         );
         dbg!(start.elapsed());
-    }
+    } //
+
+    #[test]
+    fn fens() {
+        use crate::board::bishop_magic::init_bishop_magics;
+        use crate::board::rook_magic::init_rook_magics;
+
+        init_rook_magics();
+        init_bishop_magics();
+
+        let fens: HashMap<&str, Vec<[u8; 2]>> = HashMap::from([
+            (
+                "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w",
+                vec![[12, 28], [11, 27], [6, 21], [10, 26], [12, 20]],
+            ),
+            (
+                "r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPP1PPP/RNBQKBNR w",
+                vec![[11, 27], [6, 21], [1, 18]],
+            ),
+            (
+                "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w",
+                vec![[5, 26], [1, 18], [11, 27], [5, 33], [15, 23]],
+            ),
+            (
+                "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w",
+                vec![[21, 38], [3, 12], [11, 19]],
+            ),
+            (
+                "r1bqkb1r/ppp2ppp/2n2n2/3pp1N1/2B1P3/8/PPPP1PPP/RNBQK2R w",
+                vec![[28, 35]],
+            ),
+            (
+                "r1bqkb1r/ppp2ppp/5n2/3Pp1N1/2Bn4/8/PPPP1PPP/RNBQK2R w",
+                vec![[10, 18], [35, 43], [1, 18]],
+            ),
+            (
+                "r1b1kb1r/ppp2ppp/3q1n2/4p1N1/2Bn4/8/PPPP1PPP/RNBQK2R w",
+                vec![[11, 19], [10, 18]],
+            ),
+            (
+                "r1b2b1r/ppp1kBpp/3q1n2/4p1N1/3n4/8/PPPP1PPP/RNBQK2R w",
+                vec![[53, 17]],
+            ),
+            (
+                "r1b2b1r/ppp1kBp1/3q1n1p/4p1N1/3n4/2P5/PP1P1PPP/RNBQK2R w",
+                vec![[18, 27], [53, 26]],
+            ),
+            (
+                "r1b2b1r/ppp2kp1/3q1n1p/4p3/3n4/2P4N/PP1P1PPP/RNBQK2R w",
+                vec![[18, 27]],
+            ),
+            (
+                "r1b2b1r/ppp2kp1/3q1n1p/8/3p4/7N/PP1P1PPP/RNBQK2R w",
+                vec![[11, 19], [4, 5]],
+            ),
+            (
+                "r4b1r/ppp2kp1/3qbn1p/8/3p4/1Q5N/PP1P1PPP/RNB1K2R w",
+                vec![[17, 3]],
+            ),
+            (
+                "4rb1r/ppp2kp1/3qbn1p/8/3p4/7N/PP1P1PPP/RNBQK2R w",
+                vec![[4, 5]],
+            ),
+            (
+                "4rb1r/ppp2kp1/4bn1p/4q3/3p4/7N/PP1P1PPP/RNBQ1K1R w",
+                vec![[11, 19]],
+            ),
+            (
+                "4rb1r/ppp2kp1/5n1p/4q3/3p2b1/3P3N/PP3PPP/RNBQ1K1R w",
+                vec![[13, 21]],
+            ),
+            (
+                "4r2r/ppp2kp1/5n1p/4q3/1b1p2b1/3P1P1N/PP4PP/RNBQ1K1R w",
+                vec![[1, 11]],
+            ),
+            (
+                "4r2r/ppp2kp1/5n1p/4q3/3p2b1/3P1P1N/PP1b2PP/RN1Q1K1R w",
+                vec![[1, 11]],
+            ),
+            (
+                "4r2r/ppp2kp1/5n1p/4q3/3p4/3P1P1b/PP1N2PP/R2Q1K1R w",
+                vec![[14, 23]],
+            ),
+            (
+                "4rr2/ppp2kp1/5n1p/4q3/3p4/3P1P1P/PP1N3P/R2Q1K1R w",
+                vec![[11, 28], [3, 17]],
+            ),
+            (
+                "4rr2/ppp2kp1/5n1p/8/2Np1q2/3P1P1P/PP5P/R2Q1K1R w",
+                vec![[7, 6]],
+            ),
+            (
+                "4rr2/pp3kp1/2p2n1p/8/2Np1q2/3P1P1P/PP5P/2RQ1K1R w",
+                vec![[7, 6]],
+            ),
+            (
+                "5r2/pp3kp1/2p1rn1p/8/P1Np1q2/3P1P1P/1P5P/2RQ1K1R w",
+                vec![[24, 32], [7, 6]],
+            ),
+            (
+                "5r2/pp3kp1/2p1r2p/3n4/P1Np1q2/3P1P1P/1P5P/R2Q1K1R w",
+                vec![[7, 6]],
+            ),
+            (
+                "5rk1/pp4p1/2p1r2p/3n4/P1Np1q2/R2P1P1P/1P5P/3Q1K1R w",
+                vec![[26, 43]],
+            ),
+            (
+                "5rk1/p5p1/1pp1r2p/3n4/P1Np1q2/R2P1P1P/1P5P/3Q1KR1 w",
+                vec![[6, 22]],
+            ),
+            (
+                "5rk1/p5p1/1pp1r2p/3n4/P1Np4/R2P1P1P/1P5q/3Q1K2 w",
+                vec![[30, 6], [9, 17], [16, 0], [23, 31], [24, 32]],
+            ),
+            (
+                "5rk1/p5p1/1pp2r1p/3n4/P1NpR3/R2P1P1P/1P5q/3Q1K2 w",
+                vec![[5, 4]],
+            ),
+            (
+                "5rk1/p5p1/1pp2r1p/4N3/P2pR3/R2PnP1P/1P5q/3Q1K2 w",
+                vec![[28, 20], [5, 4]],
+            ),
+            (
+                "5rk1/p5p1/1pp2r1p/4N3/P7/R2PpP1P/1P5q/3Q1K2 w",
+                vec![[3, 17], [3, 10], [36, 30], [3, 4], [3, 11]],
+            ),
+            (
+                "5r1k/p5p1/1pp2r1p/4N3/P7/RQ1PpP1P/1P5q/5K2 w",
+                vec![[17, 10], [17, 62], [36, 46], [36, 53], [5, 4]],
+            ),
+            (
+                "5r1k/p5p1/1pp4p/4N3/P7/R2Ppr1P/1PQ4q/5K2 w",
+                vec![[36, 21], [10, 13], [5, 4]],
+            ),
+            (
+                "7k/p5p1/1pp4p/8/P7/R2Ppr1P/1PQ4q/5K2 w",
+                vec![[5, 4], [10, 13]],
+            ),
+            (
+                "7k/p5p1/1pp4p/8/P7/R2Ppr1P/1Pq5/4K3 w",
+                vec![[9, 17], [19, 27], [23, 31], [24, 32], [9, 25]],
+            ),
+        ]);
+
+        for (i, (fen, moves)) in fens.iter().enumerate() {
+            println!("test {}/{}", i + 1, fens.len());
+            println!("fen: {}", fen);
+            println!("moves: {:?}\n", moves);
+            let mut board = board::Board::new();
+            board.load_from_fen(fen);
+
+            let best_move = board.engine(64, 1, true, true, std::time::Duration::from_secs(20));
+            dbg!((best_move.from(), best_move.to()));
+
+            if moves.contains(&[best_move.from() as u8, best_move.to() as u8]) {
+                println!("✅ ok");
+            } else {
+                println!("❌ fail");
+            }
+
+            println!("\n\n\n");
+        }
+    }//
 }

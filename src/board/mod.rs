@@ -4,8 +4,8 @@ mod constants;
 mod engine;
 pub mod move_gen;
 pub mod rook_magic;
-mod zobrist;
 mod test;
+mod zobrist;
 
 pub use board::Board;
 
@@ -15,13 +15,12 @@ pub struct TTEntry {
     pub key: u64,  // full zobrist
     pub depth: i8, // remaining depth
     pub bound: Bound,
-    pub score: i32,      // normalized score
+    pub score: i32, // normalized score
 }
 pub struct TranspositionTable {
     table: Vec<Option<TTEntry>>,
     mask: usize,
 }
-
 
 #[repr(u8)]
 #[derive(Copy, Clone)]
@@ -72,17 +71,28 @@ impl PieceType {
     }
 }
 
-#[derive(Copy, Clone, Debug , PartialEq, Eq , Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct Move(u32);
 
 impl Move {
     #[inline(always)]
-    pub fn new(from: u8, to: u8, piece: PieceType, capture: bool) -> Self {
+    pub fn new(
+        from: u8,
+        to: u8,
+        piece: PieceType,
+        capture: bool,
+        castling: bool,
+        promotion: bool,
+        en_passant: bool,
+    ) -> Self {
         let mut m = from as u32;
         m |= (to as u32) << 6;
         m |= (piece as u32) << 12;
         m |= (capture as u32) << 16;
+        m |= (castling as u32) << 17;
+        m |= (promotion as u32) << 18;
+        m |= (en_passant as u32) << 19;
         Move(m)
     }
 
@@ -138,7 +148,16 @@ impl Move {
         let rank_to = bytes[3] - b'1';
         let to = rank_to * 8 + file_to;
 
-        Move::new(from, to, piece, capture)
+        Move::new(from, to, piece, capture , false , false , false)
+    } //
+
+    #[inline(always)]
+    pub fn is_castling(self) -> bool {
+        ((self.0 >> 17) & 1) != 0
+    }//
+    #[inline(always)]
+    pub fn is_en_passant(self) -> bool {
+        ((self.0 >> 19) & 1) != 0
     }
 } //
 
@@ -148,7 +167,11 @@ pub struct UnMakeMove {
     piece: PieceType,
     captured: Option<PieceType>,
     occupied: BitBoard,
+    is_castling: bool,
+    is_en_passant: bool,
     hash: u64,
+    castling: u8,
+    en_passant: Option<u8>,
 }
 
 impl UnMakeMove {
@@ -157,8 +180,12 @@ impl UnMakeMove {
         to: u8,
         piece: PieceType,
         captured: Option<PieceType>,
+        is_castling: bool,
+        is_en_passant: bool,
         occupied: BitBoard,
         hash: u64,
+        castling: u8,
+        en_passant: Option<u8>,
     ) -> UnMakeMove {
         UnMakeMove {
             from,
@@ -167,6 +194,10 @@ impl UnMakeMove {
             captured,
             occupied,
             hash,
+            is_castling,
+            is_en_passant,
+            castling,
+            en_passant,
         }
     }
 }

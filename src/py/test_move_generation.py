@@ -15,40 +15,42 @@ def safe_random_fen():
         parts = fen.split()
         board2 = chess.Board(fen)
 
-        if board2.has_kingside_castling_rights(chess.WHITE): continue
-        if board2.has_queenside_castling_rights(chess.WHITE): continue
-        if board2.has_kingside_castling_rights(chess.BLACK): continue
-        if board2.has_queenside_castling_rights(chess.BLACK): continue
+        # if board2.has_kingside_castling_rights(chess.WHITE): continue
+        # if board2.has_queenside_castling_rights(chess.WHITE): continue
+        # if board2.has_kingside_castling_rights(chess.BLACK): continue
+        # if board2.has_queenside_castling_rights(chess.BLACK): continue
+
+        return " ".join(parts)
 
         # Reject promotions
-        for sq in board2.pieces(chess.PAWN, chess.WHITE):
-            if chess.square_rank(sq) == 6:
-                break
-        else:
-            for sq in board2.pieces(chess.PAWN, chess.BLACK):
-                if chess.square_rank(sq) == 1:
-                    break
-            else:
-                # Remove castling + ep
-                parts[2] = "-"
-                parts[3] = "-"
-                return " ".join(parts)
+        # for sq in board2.pieces(chess.PAWN, chess.WHITE):
+        #     if chess.square_rank(sq) == 6:
+        #         break
+        # else:
+        #     for sq in board2.pieces(chess.PAWN, chess.BLACK):
+        #         if chess.square_rank(sq) == 1:
+        #             break
+        #     else:
+        #         # Remove castling + ep
+        #         parts[2] = "-"
+        #         parts[3] = "-"
+        #         return " ".join(parts)
 
 def reference_moves(board: chess.Board):
     ref = []
 
     for m in board.legal_moves:
         # Skip promotions
-        if m.promotion is not None:
-            continue
+        # if m.promotion is not None:
+        #     continue
 
         # Skip castling
-        if board.is_castling(m):
-            continue
+        # if board.is_castling(m):
+        #     continue
 
         # Skip en-passant
-        if board.is_en_passant(m):
-            continue
+        # if board.is_en_passant(m):
+        #     continue
 
         ref.append((m.from_square, m.to_square))
 
@@ -84,10 +86,11 @@ while True:
     # fen = "1rb3kr/p2p4/np6/2p1qppp/5PnP/PPPp4/1B2P1KR/RN3BN1 w - - 0 21"
     # fen = "2kr1bnB/pppN4/6p1/1N3p2/1np2P1r/P3Q3/4P1PP/1bK2BR1 w - - 2 20"
     # fen = "8/7n/3r1B1P/4Nk2/b7/5QB1/pKN1q1Pb/8 b - - 0 16"
-    minimal_fen = fen.split(" ")[0:2]
-    print("Random FEN:")
-    print(fen)
-
+    # minimal_fen = fen.split(" ")[0:2]
+    # print("Random FEN:")
+    # print(fen)
+    if counter % 100 == 0:
+        print("Counter:", counter)
     board = chess.Board(fen)
 
     moves = set(reference_moves(board))
@@ -100,10 +103,9 @@ while True:
         text=True
     )
 
-    out, _ = p.communicate(minimal_fen[0] + " " + minimal_fen[1])
+    out, _ = p.communicate(fen)
     rust_moves = set(tuple(map(int, line.split())) for line in out.splitlines())
 
-    print(rust_moves)
 
     if moves != rust_moves:
         print("Counter:", counter)
