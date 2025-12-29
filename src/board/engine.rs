@@ -1,9 +1,8 @@
 use rand::prelude::IndexedRandom;
 use smallvec::SmallVec;
-use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::thread; // Import the trait for random selection
+use std::thread::{self, current}; // Import the trait for random selection
 use std::time::Duration;
 
 use crate::board::constants::{RANK_1, RANK_8};
@@ -346,42 +345,44 @@ impl Board {
 
         let mut best_score = -30_000;
 
+        let opposite_turn = self.opposite_turn();
+
         for mv in iter {
             if mv.is_castling() {
                 match mv.to() {
                     6 => {
-                        if self.is_square_attacked(6, self.opposite_turn()) {
+                        if self.is_square_attacked(6, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(5, self.opposite_turn()) {
+                        } else if self.is_square_attacked(5, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(4, self.opposite_turn()) {
+                        } else if self.is_square_attacked(4, opposite_turn) {
                             continue;
                         }
                     }
                     2 => {
-                        if self.is_square_attacked(2, self.opposite_turn()) {
+                        if self.is_square_attacked(2, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(3, self.opposite_turn()) {
+                        } else if self.is_square_attacked(3, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(4, self.opposite_turn()) {
+                        } else if self.is_square_attacked(4, opposite_turn) {
                             continue;
                         }
                     }
                     58 => {
-                        if self.is_square_attacked(58, self.opposite_turn()) {
+                        if self.is_square_attacked(58, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(59, self.opposite_turn()) {
+                        } else if self.is_square_attacked(59, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(60, self.opposite_turn()) {
+                        } else if self.is_square_attacked(60, opposite_turn) {
                             continue;
                         }
                     }
                     62 => {
-                        if self.is_square_attacked(62, self.opposite_turn()) {
+                        if self.is_square_attacked(62, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(61, self.opposite_turn()) {
+                        } else if self.is_square_attacked(61, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(60, self.opposite_turn()) {
+                        } else if self.is_square_attacked(60, opposite_turn) {
                             continue;
                         }
                     }
@@ -392,7 +393,7 @@ impl Board {
             let unmake_move = self.make_move(*mv);
 
             // Filter illegal moves
-            if self.is_king_in_check(self.opposite_turn()) {
+            if self.is_king_in_check(opposite_turn) {
                 self.unmake_move(unmake_move);
                 continue;
             }
@@ -555,42 +556,46 @@ impl Board {
         //     println!("The current castling {:b}", self.castling);
         // }
 
+        let opposite_turn = self.opposite_turn();
+        let current_turn = self.turn; // Will be the opposite one making the move
+
+
         for mv in moves {
             if mv.is_castling() {
                 match mv.to() {
                     6 => {
-                        if self.is_square_attacked(6, self.opposite_turn()) {
+                        if self.is_square_attacked(6, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(5, self.opposite_turn()) {
+                        } else if self.is_square_attacked(5, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(4, self.opposite_turn()) {
+                        } else if self.is_square_attacked(4, opposite_turn) {
                             continue;
                         }
                     }
                     2 => {
-                        if self.is_square_attacked(2, self.opposite_turn()) {
+                        if self.is_square_attacked(2, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(3, self.opposite_turn()) {
+                        } else if self.is_square_attacked(3, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(4, self.opposite_turn()) {
+                        } else if self.is_square_attacked(4, opposite_turn) {
                             continue;
                         }
                     }
                     58 => {
-                        if self.is_square_attacked(58, self.opposite_turn()) {
+                        if self.is_square_attacked(58, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(59, self.opposite_turn()) {
+                        } else if self.is_square_attacked(59, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(60, self.opposite_turn()) {
+                        } else if self.is_square_attacked(60, opposite_turn) {
                             continue;
                         }
                     }
                     62 => {
-                        if self.is_square_attacked(62, self.opposite_turn()) {
+                        if self.is_square_attacked(62, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(61, self.opposite_turn()) {
+                        } else if self.is_square_attacked(61, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(60, self.opposite_turn()) {
+                        } else if self.is_square_attacked(60, opposite_turn) {
                             continue;
                         }
                     }
@@ -598,15 +603,17 @@ impl Board {
                 }
             };
 
+            // Turn switches here
             let unmake = self.make_move(mv);
 
-            if self.is_king_in_check(self.opposite_turn()) {
+            if self.is_king_in_check(current_turn) {
                 self.unmake_move(unmake);
                 continue;
             }
 
             let inner_nodes = self.perft(depth + 1, max_depth);
 
+            // Turn switches back
             self.unmake_move(unmake);
 
             if depth == 0 {

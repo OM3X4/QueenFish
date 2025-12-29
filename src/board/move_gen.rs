@@ -465,54 +465,50 @@ impl Board {
             //     }
             // }
 
-            // println!("Fen : {}" , self.to_fen());
-
-            // println!("{}" , mv.to_uci());
+            let opposite_turn = self.opposite_turn();
 
             if mv.is_castling() {
                 match mv.to() {
                     6 => {
-                        if self.is_square_attacked(6, self.opposite_turn()) {
+                        if self.is_square_attacked(6, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(5, self.opposite_turn()) {
+                        } else if self.is_square_attacked(5, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(4, self.opposite_turn()) {
+                        } else if self.is_square_attacked(4, opposite_turn) {
                             continue;
                         }
                     }
                     2 => {
-                        if self.is_square_attacked(2, self.opposite_turn()) {
+                        if self.is_square_attacked(2, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(3, self.opposite_turn()) {
+                        } else if self.is_square_attacked(3, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(4, self.opposite_turn()) {
+                        } else if self.is_square_attacked(4, opposite_turn) {
                             continue;
                         }
                     }
                     58 => {
-                        if self.is_square_attacked(58, self.opposite_turn()) {
+                        if self.is_square_attacked(58, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(59, self.opposite_turn()) {
+                        } else if self.is_square_attacked(59, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(60, self.opposite_turn()) {
+                        } else if self.is_square_attacked(60, opposite_turn) {
                             continue;
                         }
                     }
                     62 => {
-                        if self.is_square_attacked(62, self.opposite_turn()) {
+                        if self.is_square_attacked(62, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(61, self.opposite_turn()) {
+                        } else if self.is_square_attacked(61, opposite_turn) {
                             continue;
-                        } else if self.is_square_attacked(60, self.opposite_turn()) {
+                        } else if self.is_square_attacked(60, opposite_turn) {
                             continue;
                         }
                     }
                     _ => (),
                 }
             };
-
-            let before = self.clone();
-
+            // Turn switched here
             let unmake_move = self.make_move(mv);
 
             let is_illegal = self.is_king_in_check(self.opposite_turn());
@@ -521,11 +517,9 @@ impl Board {
                 legal_moves.push(mv);
             }
 
+            // Turn returns back
             self.unmake_move(unmake_move);
 
-            if before != *self {
-                println!("Board ruined ma nigga on move : {}", mv.to_uci());
-            }
         }
         return legal_moves;
     } //
@@ -869,187 +863,6 @@ impl Board {
 
         return undo;
     }//
-
-    pub fn make_move_old(&mut self, mv: Move) -> UnMakeMove {
-        let from = mv.from() as u8;
-        let to = mv.to() as u8;
-        let piece = mv.piece();
-
-        let captured = if mv.is_en_passant() {
-            match self.turn {
-                Turn::WHITE => Some(PieceType::BlackPawn),
-                Turn::BLACK => Some(PieceType::WhitePawn),
-            }
-        } else {
-            self.piece_at[to as usize]
-        };
-
-        let undo = UnMakeMove {
-            from,
-            to,
-            piece,
-            captured,
-            hash: self.hash,
-            is_en_passant: mv.is_en_passant(),
-            occupied: self.occupied,
-            is_castling: mv.is_castling(),
-            castling: self.castling,
-            en_passant: self.en_passant,
-        };
-
-        /* -----------------------------
-            Update castling rights
-        ----------------------------- */
-        match piece {
-            PieceType::WhiteKing => self.castling &= !0b0011,
-            PieceType::BlackKing => self.castling &= !0b1100,
-            PieceType::WhiteRook => {
-                if from == 0 {
-                    self.castling &= !0b0010;
-                }
-                if from == 7 {
-                    self.castling &= !0b0001;
-                }
-            }
-            PieceType::BlackRook => {
-                if from == 56 {
-                    self.castling &= !0b1000;
-                }
-                if from == 63 {
-                    self.castling &= !0b0100;
-                }
-            }
-            _ => {}
-        };
-
-        // Update castling right due to a rook getting captured
-        if let Some(cap) = captured {
-            match cap {
-                PieceType::WhiteRook => {
-                    if to == 0 {
-                        self.castling &= !0b0010;
-                    }
-                    if to == 7 {
-                        self.castling &= !0b0001;
-                    }
-                }
-                PieceType::BlackRook => {
-                    if to == 56 {
-                        self.castling &= !0b1000;
-                    }
-                    if to == 63 {
-                        self.castling &= !0b0100;
-                    }
-                }
-                _ => {}
-            }
-        };
-
-        /* -----------------------------
-            Clear en-passant by default
-        ----------------------------- */
-        self.en_passant = None;
-
-        /* -----------------------------
-            Castling move
-        ----------------------------- */
-        if mv.is_castling() {
-            match (self.turn, to) {
-                (Turn::WHITE, 6) => {
-                    // e1g1
-                    self.remove_piece(PieceType::WhiteKing, 4);
-                    self.remove_piece(PieceType::WhiteRook, 7);
-                    self.add_piece(PieceType::WhiteKing, 6);
-                    self.add_piece(PieceType::WhiteRook, 5);
-                }
-                (Turn::WHITE, 2) => {
-                    // e1c1
-                    self.remove_piece(PieceType::WhiteKing, 4);
-                    self.remove_piece(PieceType::WhiteRook, 0);
-                    self.add_piece(PieceType::WhiteKing, 2);
-                    self.add_piece(PieceType::WhiteRook, 3);
-                }
-                (Turn::BLACK, 62) => {
-                    // e8g8
-                    self.remove_piece(PieceType::BlackKing, 60);
-                    self.remove_piece(PieceType::BlackRook, 63);
-                    self.add_piece(PieceType::BlackKing, 62);
-                    self.add_piece(PieceType::BlackRook, 61);
-                }
-                (Turn::BLACK, 58) => {
-                    // e8c8
-                    self.remove_piece(PieceType::BlackKing, 60);
-                    self.remove_piece(PieceType::BlackRook, 56);
-                    self.add_piece(PieceType::BlackKing, 58);
-                    self.add_piece(PieceType::BlackRook, 59);
-                }
-                _ => (),
-            }
-
-            self.switch_turn();
-
-            return undo;
-        }
-
-        /* -----------------------------
-            En passant capture
-        ----------------------------- */
-        if mv.is_en_passant() {
-            match self.turn {
-                Turn::WHITE => {
-                    self.remove_piece(PieceType::BlackPawn, to - 8);
-                    self.remove_piece(PieceType::WhitePawn, from);
-                    self.add_piece(PieceType::WhitePawn, to);
-                }
-                Turn::BLACK => {
-                    self.remove_piece(PieceType::WhitePawn, to + 8);
-                    self.remove_piece(PieceType::BlackPawn, from);
-                    self.add_piece(PieceType::BlackPawn, to);
-                }
-            }
-
-            self.switch_turn();
-
-            return undo;
-        }
-
-        /* -----------------------------
-            Normal capture
-        ----------------------------- */
-        if let Some(p) = captured {
-            self.remove_piece(p, to);
-        }
-
-        /* -----------------------------
-            Promotion
-        ----------------------------- */
-        if piece == PieceType::WhitePawn && to >= 56 {
-            self.remove_piece(PieceType::WhitePawn, from);
-            self.add_piece(PieceType::WhiteQueen, to);
-        } else if piece == PieceType::BlackPawn && to <= 7 {
-            self.remove_piece(PieceType::BlackPawn, from);
-            self.add_piece(PieceType::BlackQueen, to);
-        } else {
-            self.remove_piece(piece, from);
-            self.add_piece(piece, to);
-        }
-
-        /* -----------------------------
-            Set en passant square
-        ----------------------------- */
-        if piece == PieceType::WhitePawn && from / 8 == 1 && to / 8 == 3 {
-            self.en_passant = Some(from + 8);
-        }
-        if piece == PieceType::BlackPawn && from / 8 == 6 && to / 8 == 4 {
-            self.en_passant = Some(from - 8);
-        }
-
-        self.switch_turn();
-        self.occupied = self.get_all_bits();
-        self.piece_at = self.generate_piece_at();
-
-        undo
-    } //
 
     pub fn unmake_move(&mut self, unmake_move: UnMakeMove) {
         // self.bitboards = unmake_move.bitboards;
