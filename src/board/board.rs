@@ -127,6 +127,8 @@ impl Board {
         self.occupied.0 |= mask;
         self.piece_at[sq as usize] = Some(piece);
         self.eval += piece.value();
+        self.eval += piece.pst(sq);
+
 
         self.hash ^= Z_PIECE[piece.piece_index()][sq as usize];
     } //
@@ -146,6 +148,7 @@ impl Board {
         self.occupied.0 &= !mask;
         self.piece_at[sq as usize] = None;
         self.eval -= piece.value();
+        self.eval -= piece.pst(sq);
 
         self.hash ^= Z_PIECE[piece.piece_index()][sq as usize];
     } //

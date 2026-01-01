@@ -9,6 +9,8 @@ mod zobrist;
 
 pub use board::Board;
 
+use crate::board::constants::{BISHOPS_BONUS, KING_BONUS, PAWNS_BONUS, QUEENS_BONUS, ROOK_BONUS};
+
 #[derive(Copy, Clone)]
 
 pub struct TTEntry {
@@ -68,6 +70,23 @@ impl PieceType {
     }
     pub fn value(self) -> i32 {
         unsafe { *PIECE_VALUE.get_unchecked(self as usize) }
+    }
+    pub fn pst(&self , square : u8) -> i32 {
+        match self.piece_index() {
+            0 => PAWNS_BONUS[square as usize],
+            1 => KING_BONUS[square as usize],
+            2 => BISHOPS_BONUS[square as usize],
+            3 => ROOK_BONUS[square as usize],
+            4 => QUEENS_BONUS[square as usize],
+            5 => KING_BONUS[square as usize],
+            6 => PAWNS_BONUS[square as usize ^ 56],
+            7 => KING_BONUS[square as usize ^ 56],
+            8 => BISHOPS_BONUS[square as usize ^ 56],
+            9 => ROOK_BONUS[square as usize ^ 56],
+            10 => QUEENS_BONUS[square as usize ^ 56],
+            11 => KING_BONUS[square as usize ^ 56],
+            _ => 0
+        }
     }
 }
 

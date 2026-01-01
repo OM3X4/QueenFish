@@ -3,7 +3,7 @@ use crate::board::bishop_magic::bishop_attacks;
 use crate::board::constants::{RANK_3, RANK_4, RANK_5, RANK_6};
 use crate::board::rook_magic::rook_attacks;
 use smallvec::SmallVec;
-
+use crate::board::zobrist::{Z_CASTLING , Z_SIDE};
 use super::constants::{
     BLACK_PAWN_ATTACKS, KING_ATTACK_TABLE, KNIGHTS_ATTACK_TABLE, WHITE_PAWN_ATTACKS,
 };
@@ -160,7 +160,9 @@ impl Board {
             let mut attacks = attacks_bb & enemy_pieces_bb.0;
 
             if let Some(en_passant_square) = self.en_passant {
-                if attacks_bb & (1u64 << en_passant_square) != 0 && ((1u64 << en_passant_square) & RANK_6) != 0 {
+                if attacks_bb & (1u64 << en_passant_square) != 0
+                    && ((1u64 << en_passant_square) & RANK_6) != 0
+                {
                     moves.push(Move::new(
                         from as u8,
                         en_passant_square as u8,
@@ -230,7 +232,9 @@ impl Board {
             let mut attacks = attacks_bb & enemy_pieces_bb.0;
 
             if let Some(en_passant_square) = self.en_passant {
-                if attacks_bb & (1u64 << en_passant_square) != 0 && ((1u64 << en_passant_square) & RANK_3) != 0 {
+                if attacks_bb & (1u64 << en_passant_square) != 0
+                    && ((1u64 << en_passant_square) & RANK_3) != 0
+                {
                     moves.push(Move::new(
                         from as u8,
                         en_passant_square as u8,
@@ -447,7 +451,6 @@ impl Board {
             return legal_moves;
         }
 
-
         for mv in pesudo_moves {
             // if !is_king_in_check_now {
             //     if ((1u64 << mv.from()) & SQUARE_RAYS[king_square]) == 0 && mv.piece() != king_type
@@ -519,7 +522,6 @@ impl Board {
 
             // Turn returns back
             self.unmake_move(unmake_move);
-
         }
         return legal_moves;
     } //
@@ -691,7 +693,6 @@ impl Board {
     } //
 
     pub fn make_move(&mut self, mv: Move) -> UnMakeMove {
-
         // if mv.is_en_passant() {
         //     println!("En passant spotted the move {} , the fen before : {}", mv.to_uci(), self.to_fen());
         //     println!("from {} to {}", mv.from(), mv.to());
@@ -701,6 +702,8 @@ impl Board {
         let from = mv.from() as u8;
         let to = mv.to() as u8;
         let piece = mv.piece();
+
+        let old_castling_rights = self.castling;
 
         let capture = match mv.is_en_passant() {
             true => match self.turn {
@@ -721,7 +724,7 @@ impl Board {
             is_castling: mv.is_castling(),
             castling: self.castling,
             en_passant: self.en_passant,
-            eval: self.eval
+            eval: self.eval,
         };
 
         /* -----------------------------
@@ -846,10 +849,16 @@ impl Board {
         /* -----------------------------
             Set en passant square
         ----------------------------- */
-        if piece == PieceType::WhitePawn && (RANK_2 & (1u64 << from)) != 0 && (RANK_4 & (1u64 << to)) != 0 {
+        if piece == PieceType::WhitePawn
+            && (RANK_2 & (1u64 << from)) != 0
+            && (RANK_4 & (1u64 << to)) != 0
+        {
             self.en_passant = Some(from + 8);
         }
-        if piece == PieceType::BlackPawn && (RANK_7 & (1u64 << from)) != 0 && (RANK_5 & (1u64 << to)) != 0 {
+        if piece == PieceType::BlackPawn
+            && (RANK_7 & (1u64 << from)) != 0
+            && (RANK_5 & (1u64 << to)) != 0
+        {
             self.en_passant = Some(from - 8);
         }
 
@@ -858,12 +867,29 @@ impl Board {
         // }
 
         self.switch_turn();
+
+        // Updating the hash for turn
+        self.hash ^= *Z_SIDE;
+
+        // Updating the hash for castling rights
+        let diff = old_castling_rights ^ self.castling;
+
+        if diff & 0b0001 != 0 {
+            self.hash ^= Z_CASTLING[0];
+        }
+        if diff & 0b0010 != 0 {
+            self.hash ^= Z_CASTLING[1];
+        }
+        if diff & 0b0100 != 0 {
+            self.hash ^= Z_CASTLING[2];
+        }
+        if diff & 0b1000 != 0 {
+            self.hash ^= Z_CASTLING[3];
+        }
         // self.piece_at = self.generate_piece_at();
 
-
-
         return undo;
-    }//
+    } //
 
     pub fn unmake_move(&mut self, unmake_move: UnMakeMove) {
         // self.bitboards = unmake_move.bitboards;
@@ -938,6 +964,8 @@ impl Board {
         self.castling = unmake_move.castling;
         self.en_passant = unmake_move.en_passant;
         self.eval = unmake_move.eval;
+        self.hash = unmake_move.hash;
+        self.occupied = unmake_move.occupied;
         // self.occupied = unmake_move.occupied;
         // self.hash = unmake_move.hash;
         // self.occupied = self.get_all_bits();

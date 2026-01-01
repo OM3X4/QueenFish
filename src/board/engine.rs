@@ -8,7 +8,7 @@ use std::time::Duration;
 use crate::board::constants::{RANK_1, RANK_8};
 
 use super::constants::{MVV_LVA, get_book_moves};
-use super::zobrist::{Z_PIECE, Z_SIDE};
+use super::zobrist::{Z_PIECE, Z_SIDE , Z_CASTLING};
 use super::{Board, Bound, Move, PieceType, TTEntry, TranspositionTable, Turn};
 
 static NODE_COUNT: AtomicU64 = AtomicU64::new(0);
@@ -150,8 +150,14 @@ impl Board {
             h ^= *Z_SIDE;
         }
 
+        if self.castling & 0b0001 != 0 { h ^= Z_CASTLING[0]; }
+        if self.castling & 0b0010 != 0 { h ^= Z_CASTLING[1]; }
+        if self.castling & 0b0100 != 0 { h ^= Z_CASTLING[2]; }
+        if self.castling & 0b1000 != 0 { h ^= Z_CASTLING[3]; }
+
         h
     } //
+
 
     /// Returns a random move from the opening book for a given FEN string.
     /// Returns None if the position is not in the book.
@@ -298,7 +304,6 @@ impl Board {
             return alpha;
         }
 
-
         if stand_pat >= beta {
             return beta;
         }
@@ -338,6 +343,7 @@ impl Board {
         mut alpha: i32,
         beta: i32,
         tt: &mut TranspositionTable,
+        is_alpha_beta: bool,
         is_tt: bool,
         is_null_move_pruning: bool,
         is_lmr: bool,
@@ -351,7 +357,7 @@ impl Board {
         // 1. TT LOOKUP
         if is_tt {
             if let Some(score) = tt.probe(self.hash, depth_remaining as i8, alpha, beta) {
-                // SKIP_COUNT.fetch_add(1, Ordering::Relaxed);
+                println!("Skipping alpha-beta, found in TT");
                 return score;
             }
         };
@@ -378,6 +384,7 @@ impl Board {
                 -beta + 1,
                 -beta,
                 tt,
+                is_alpha_beta,
                 false,
                 false,
                 false,
@@ -470,6 +477,7 @@ impl Board {
                     -beta,
                     -alpha,
                     tt,
+                    is_alpha_beta,
                     is_tt,
                     is_null_move_pruning,
                     is_lmr,
@@ -488,6 +496,7 @@ impl Board {
                     -beta,
                     -alpha,
                     tt,
+                    is_alpha_beta,
                     is_tt,
                     is_null_move_pruning,
                     is_lmr,
@@ -501,6 +510,7 @@ impl Board {
                         -beta,
                         -alpha,
                         tt,
+                        is_alpha_beta,
                         is_tt,
                         is_null_move_pruning,
                         is_lmr,
@@ -516,7 +526,7 @@ impl Board {
             best_score = best_score.max(score);
             alpha = alpha.max(best_score);
 
-            if alpha >= beta {
+            if alpha >= beta && is_alpha_beta {
                 break; // Alpha Cutoff
             }
         } //
@@ -546,6 +556,7 @@ impl Board {
     pub fn engine_singlethread(
         &mut self,
         max_depth: i32,
+        is_alpha_beta: bool,
         is_tt: bool,
         is_null_move_pruning: bool,
         is_lmr: bool,
@@ -582,6 +593,7 @@ impl Board {
                     -beta,
                     -alpha,
                     &mut tt,
+                    is_alpha_beta,
                     is_tt,
                     is_null_move_pruning,
                     is_lmr,
@@ -614,7 +626,7 @@ impl Board {
     pub fn engine(
         &mut self,
         max_depth: i32,
-        threads: i32,
+        is_alpha_beta: bool,
         is_tt: bool,
         is_null_move_pruning: bool,
         is_lmr: bool,
@@ -647,6 +659,7 @@ impl Board {
 
         self.engine_singlethread(
             max_depth,
+            is_alpha_beta,
             is_tt,
             is_null_move_pruning,
             is_lmr,
@@ -771,7 +784,7 @@ mod test {
             board
                 .engine(
                     6,
-                    1,
+                    true,
                     false,
                     false,
                     false,
@@ -790,180 +803,6 @@ mod test {
 
         init_rook_magics();
         init_bishop_magics();
-
-        // let fens: HashMap<&str, Vec<[u8; 2]>> = HashMap::from([
-        //     (
-        //         "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w",
-        //         vec![[21, 38], [3, 12], [11, 19]],
-        //     ),
-        //     (
-        //         "r1bqkb1r/ppp2ppp/2n2n2/3pp1N1/2B1P3/8/PPPP1PPP/RNBQK2R w",
-        //         vec![[28, 35]],
-        //     ),
-        //     (
-        //         "r1bqkb1r/ppp2ppp/5n2/3Pp1N1/2Bn4/8/PPPP1PPP/RNBQK2R w",
-        //         vec![[10, 18], [35, 43], [1, 18]],
-        //     ),
-        //     (
-        //         "r1b1kb1r/ppp2ppp/3q1n2/4p1N1/2Bn4/8/PPPP1PPP/RNBQK2R w",
-        //         vec![[11, 19], [10, 18]],
-        //     ),
-        //     (
-        //         "r1b2b1r/ppp1kBpp/3q1n2/4p1N1/3n4/8/PPPP1PPP/RNBQK2R w",
-        //         vec![[53, 17]],
-        //     ),
-        //     (
-        //         "r1b2b1r/ppp1kBp1/3q1n1p/4p1N1/3n4/2P5/PP1P1PPP/RNBQK2R w",
-        //         vec![[18, 27], [53, 26]],
-        //     ),
-        //     (
-        //         "r1b2b1r/ppp2kp1/3q1n1p/4p3/3n4/2P4N/PP1P1PPP/RNBQK2R w",
-        //         vec![[18, 27]],
-        //     ),
-        //     (
-        //         "r1b2b1r/ppp2kp1/3q1n1p/8/3p4/7N/PP1P1PPP/RNBQK2R w",
-        //         vec![[11, 19], [4, 5]],
-        //     ),
-        //     (
-        //         "r4b1r/ppp2kp1/3qbn1p/8/3p4/1Q5N/PP1P1PPP/RNB1K2R w",
-        //         vec![[17, 3]],
-        //     ),
-        //     (
-        //         "4rb1r/ppp2kp1/3qbn1p/8/3p4/7N/PP1P1PPP/RNBQK2R w",
-        //         vec![[4, 5]],
-        //     ),
-        //     (
-        //         "4rb1r/ppp2kp1/4bn1p/4q3/3p4/7N/PP1P1PPP/RNBQ1K1R w",
-        //         vec![[11, 19]],
-        //     ),
-        //     (
-        //         "4rb1r/ppp2kp1/5n1p/4q3/3p2b1/3P3N/PP3PPP/RNBQ1K1R w",
-        //         vec![[13, 21]],
-        //     ),
-        //     (
-        //         "4r2r/ppp2kp1/5n1p/4q3/1b1p2b1/3P1P1N/PP4PP/RNBQ1K1R w",
-        //         vec![[1, 11]],
-        //     ),
-        //     (
-        //         "4r2r/ppp2kp1/5n1p/4q3/3p2b1/3P1P1N/PP1b2PP/RN1Q1K1R w",
-        //         vec![[1, 11]],
-        //     ),
-        //     (
-        //         "4r2r/ppp2kp1/5n1p/4q3/3p4/3P1P1b/PP1N2PP/R2Q1K1R w",
-        //         vec![[14, 23]],
-        //     ),
-        //     (
-        //         "4rr2/ppp2kp1/5n1p/4q3/3p4/3P1P1P/PP1N3P/R2Q1K1R w",
-        //         vec![[11, 28], [3, 17]],
-        //     ),
-        //     (
-        //         "4rr2/ppp2kp1/5n1p/8/2Np1q2/3P1P1P/PP5P/R2Q1K1R w",
-        //         vec![[7, 6]],
-        //     ),
-        //     (
-        //         "4rr2/pp3kp1/2p2n1p/8/2Np1q2/3P1P1P/PP5P/2RQ1K1R w",
-        //         vec![[7, 6]],
-        //     ),
-        //     (
-        //         "5r2/pp3kp1/2p1rn1p/8/P1Np1q2/3P1P1P/1P5P/2RQ1K1R w",
-        //         vec![[24, 32], [7, 6]],
-        //     ),
-        //     (
-        //         "5r2/pp3kp1/2p1r2p/3n4/P1Np1q2/3P1P1P/1P5P/R2Q1K1R w",
-        //         vec![[7, 6]],
-        //     ),
-        //     (
-        //         "5rk1/pp4p1/2p1r2p/3n4/P1Np1q2/R2P1P1P/1P5P/3Q1K1R w",
-        //         vec![[26, 43]],
-        //     ),
-        //     (
-        //         "5rk1/p5p1/1pp1r2p/3n4/P1Np1q2/R2P1P1P/1P5P/3Q1KR1 w",
-        //         vec![[6, 22]],
-        //     ),
-        //     (
-        //         "5rk1/p5p1/1pp1r2p/3n4/P1Np4/R2P1P1P/1P5q/3Q1K2 w",
-        //         vec![[30, 6], [9, 17], [16, 0], [23, 31], [24, 32]],
-        //     ),
-        //     (
-        //         "5rk1/p5p1/1pp2r1p/3n4/P1NpR3/R2P1P1P/1P5q/3Q1K2 w",
-        //         vec![[5, 4]],
-        //     ),
-        //     (
-        //         "5rk1/p5p1/1pp2r1p/4N3/P2pR3/R2PnP1P/1P5q/3Q1K2 w",
-        //         vec![[28, 20], [5, 4]],
-        //     ),
-        //     (
-        //         "5rk1/p5p1/1pp2r1p/4N3/P7/R2PpP1P/1P5q/3Q1K2 w",
-        //         vec![[3, 17], [3, 10], [36, 30], [3, 4], [3, 11]],
-        //     ),
-        //     (
-        //         "5r1k/p5p1/1pp2r1p/4N3/P7/RQ1PpP1P/1P5q/5K2 w",
-        //         vec![[17, 10], [17, 62], [36, 46], [36, 53], [5, 4]],
-        //     ),
-        //     (
-        //         "5r1k/p5p1/1pp4p/4N3/P7/R2Ppr1P/1PQ4q/5K2 w",
-        //         vec![[36, 21], [10, 13], [5, 4]],
-        //     ),
-        //     (
-        //         "7k/p5p1/1pp4p/8/P7/R2Ppr1P/1PQ4q/5K2 w",
-        //         vec![[5, 4], [10, 13]],
-        //     ),
-        //     (
-        //         "7k/p5p1/1pp4p/8/P7/R2Ppr1P/1Pq5/4K3 w",
-        //         vec![[9, 17], [19, 27], [23, 31], [24, 32], [9, 25]],
-        //     ),
-        // ]);
-
-        let fens: HashMap<&str, Vec<[u8; 2]>> = HashMap::from([
-            (
-                "1kr5/3n4/q3p2p/p2n2p1/PppB1P2/5BP1/1P2Q2P/3R2K1 w",
-                vec![[29, 37]],
-            ),
-            (
-                "1n5k/3q3p/pp1p2pB/5r2/1PP1Qp2/P6P/6P1/2R3K1 w",
-                vec![[26, 34]],
-            ),
-            (
-                "1n6/4bk1r/1p2rp2/pP2pN1p/K1P1N2P/8/P5R1/3R4 w",
-                vec![[14, 6], [3, 35], [14, 22], [3, 11], [8, 16]],
-            ),
-            (
-                "1nr5/1k5r/p3pqp1/3p4/1P1P1PP1/R4N2/3Q1PK1/R7 w",
-                vec![[25, 33], [16, 17], [0, 1], [11, 20], [0, 4]],
-            ),
-            (
-                "1q2r1k1/1b2bpp1/p2ppn1p/2p5/P3PP1B/2PB1RP1/2P1Q2P/2KR4 b",
-                vec![[34, 26]],
-            ),
-            (
-                "1q4k1/5p1p/p1rprnp1/3R4/N1P1P3/1P6/P5PP/3Q1R1K w",
-                vec![[28, 36]],
-            ),
-            (
-                "1qr1k2r/1p2bp2/pBn1p3/P2pPbpp/5P2/2P1QBPP/1P1N3R/R4K2 b k -",
-                vec![[39, 31]],
-            ),
-            (
-                "1r1b2k1/2r2ppp/p1qp4/3R1NPP/1pn1PQB1/8/PPP3R1/1K6 w",
-                vec![[38, 46]],
-            ),
-            (
-                "1r1qk1nr/p3ppbp/3p2p1/1pp5/2bPP3/4B1P1/2PQNPBP/R2R2K1 w k -",
-                vec![[38, 46]],
-            ),
-            (
-                "1r1r2k1/p3n2p/b1nqpbp1/2pp4/1p3PP1/2PP1N2/PPN3BP/R1BRQ2K w - -",
-                vec![[19, 27], [15, 23], [14, 23]],
-            ),
-            (
-                "1r2n1rk/pP2q2p/P2p4/4pQ2/2P2p2/5B1P/3R1P1K/3R4 w - -",
-                vec![[26, 34], [21, 28], [3, 6], [21, 42], [21, 35], [3, 4]],
-            ),
-            (
-                "1r3bk1/7p/pp1q2p1/P1pPp3/2P3b1/4B3/1P1Q2BP/R6K w - -",
-                vec![[26, 34], [21, 28], [3, 6], [21, 42], [21, 35], [3, 4]],
-            ),
-        ]);
 
         let fens = vec![
             (
@@ -2415,7 +2254,7 @@ mod test {
         let start_time = std::time::Instant::now();
 
         for (i, (fen, moves)) in fens.iter().enumerate() {
-            if i >= 50 {
+            if i >= 5 {
                 break;
             }
             println!("test {}/{}", i + 1, fens.len());
@@ -2428,15 +2267,16 @@ mod test {
             let inner_start_time = std::time::Instant::now();
 
             let best_move = board.engine(
-                4,
-                1,
+                12,
+                true,
+                true,
+                true,
                 false,
                 false,
-                false,
-                false,
-                std::time::Duration::from_secs(20),
+                std::time::Duration::from_secs(1000),
             );
             dbg!((best_move.from(), best_move.to()));
+            dbg!(best_move.to_uci());
             dbg!(inner_start_time.elapsed());
 
             if moves.contains(&[best_move.from() as u8, best_move.to() as u8]) {
