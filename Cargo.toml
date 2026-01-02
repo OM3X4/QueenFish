@@ -54,3 +54,7 @@ path = "src/bin/moves_generation_perft.rs"
 [[bin]]
 name = "perft"
 path = "src/bin/perft.rs"
+
+[[bin]]
+name = "fens_test"
+path = "src/bin/fens_test.rs"

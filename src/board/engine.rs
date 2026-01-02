@@ -1,5 +1,5 @@
 use rand::prelude::IndexedRandom;
-use smallvec::SmallVec;
+use smallvec::{SmallVec, smallvec};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, current}; // Import the trait for random selection
@@ -8,7 +8,7 @@ use std::time::Duration;
 use crate::board::constants::{RANK_1, RANK_8};
 
 use super::constants::{MVV_LVA, get_book_moves};
-use super::zobrist::{Z_PIECE, Z_SIDE , Z_CASTLING};
+use super::zobrist::{Z_CASTLING, Z_PIECE, Z_SIDE};
 use super::{Board, Bound, Move, PieceType, TTEntry, TranspositionTable, Turn};
 
 static NODE_COUNT: AtomicU64 = AtomicU64::new(0);
@@ -150,14 +150,21 @@ impl Board {
             h ^= *Z_SIDE;
         }
 
-        if self.castling & 0b0001 != 0 { h ^= Z_CASTLING[0]; }
-        if self.castling & 0b0010 != 0 { h ^= Z_CASTLING[1]; }
-        if self.castling & 0b0100 != 0 { h ^= Z_CASTLING[2]; }
-        if self.castling & 0b1000 != 0 { h ^= Z_CASTLING[3]; }
+        if self.castling & 0b0001 != 0 {
+            h ^= Z_CASTLING[0];
+        }
+        if self.castling & 0b0010 != 0 {
+            h ^= Z_CASTLING[1];
+        }
+        if self.castling & 0b0100 != 0 {
+            h ^= Z_CASTLING[2];
+        }
+        if self.castling & 0b1000 != 0 {
+            h ^= Z_CASTLING[3];
+        }
 
         h
     } //
-
 
     /// Returns a random move from the opening book for a given FEN string.
     /// Returns None if the position is not in the book.
@@ -343,13 +350,20 @@ impl Board {
         mut alpha: i32,
         beta: i32,
         tt: &mut TranspositionTable,
+        pv: &mut [[Move; 128]; 128],
+        pv_len: &mut [usize; 128],
         is_alpha_beta: bool,
         is_tt: bool,
         is_null_move_pruning: bool,
         is_lmr: bool,
         is_quiesense: bool,
+        maximum_time: std::time::Duration
     ) -> i32 {
         NODE_COUNT.fetch_add(1, Ordering::Relaxed);
+
+        if NODE_COUNT.load(Ordering::Relaxed) % 100_000_000 == 0 {
+            println!("Nodes: {}", NODE_COUNT.load(Ordering::Relaxed));
+        }
 
         let depth_remaining = max_depth - depth;
         let orig_alpha = alpha;
@@ -357,7 +371,7 @@ impl Board {
         // 1. TT LOOKUP
         if is_tt {
             if let Some(score) = tt.probe(self.hash, depth_remaining as i8, alpha, beta) {
-                println!("Skipping alpha-beta, found in TT");
+                // println!("Skipping alpha-beta, found in TT");
                 return score;
             }
         };
@@ -384,6 +398,8 @@ impl Board {
                 -beta + 1,
                 -beta,
                 tt,
+                pv,
+                pv_len,
                 is_alpha_beta,
                 false,
                 false,
@@ -401,6 +417,13 @@ impl Board {
         self.generate_pesudo_moves(&mut moves);
 
         self.sort_by_mvv_lva(&mut moves);
+
+        if pv_len[depth as usize] > 0 {
+            let pv_move = pv[depth as usize][0];
+            if let Some(pos) = moves.iter().position(|m| *m == pv_move) {
+                moves.swap(0, pos);
+            }
+        };
 
         let iter = moves.iter();
 
@@ -477,6 +500,8 @@ impl Board {
                     -beta,
                     -alpha,
                     tt,
+                    pv,
+                    pv_len,
                     is_alpha_beta,
                     is_tt,
                     is_null_move_pruning,
@@ -496,6 +521,8 @@ impl Board {
                     -beta,
                     -alpha,
                     tt,
+                    pv,
+                    pv_len,
                     is_alpha_beta,
                     is_tt,
                     is_null_move_pruning,
@@ -510,6 +537,8 @@ impl Board {
                         -beta,
                         -alpha,
                         tt,
+                        pv,
+                        pv_len,
                         is_alpha_beta,
                         is_tt,
                         is_null_move_pruning,
@@ -524,7 +553,24 @@ impl Board {
             self.unmake_move(unmake_move);
 
             best_score = best_score.max(score);
-            alpha = alpha.max(best_score);
+
+            if score > alpha {
+                alpha = score;
+
+                let d = depth as usize;
+
+                // 1. Store this move
+                pv[d][0] = *mv;
+
+                // 2. Copy child PV
+                let next_len = pv_len[d + 1];
+                for i in 0..next_len {
+                    pv[d][i + 1] = pv[d + 1][i];
+                }
+
+                // 3. Update PV length
+                pv_len[d] = next_len + 1;
+            }
 
             if alpha >= beta && is_alpha_beta {
                 break; // Alpha Cutoff
@@ -550,7 +596,7 @@ impl Board {
             );
         };
 
-        return best_score;
+        return alpha;
     } //
 
     pub fn engine_singlethread(
@@ -573,42 +619,71 @@ impl Board {
         let mut best_move = moves[0];
         let mut tt = TranspositionTable::new(20);
 
+        const MAX_PLY: usize = 128;
+
+        let mut pv: [[Move; MAX_PLY]; MAX_PLY] = [[Move::new(0 , 0 , PieceType::WhitePawn , false , false , false , false); MAX_PLY]; MAX_PLY];
+
+        let mut pv_len: [usize; MAX_PLY] = [0; MAX_PLY];
+
         for current_depth in 1..=max_depth {
             // dbg!(current_depth);
             let mut alpha = -30_000;
             let beta = 30_000;
             let mut best_score = -30_000;
 
-            for mv in &moves {
-                if start_time.elapsed() > maximum_time {
-                    dbg!(searched_depth);
-                    return best_stable_move;
-                }
+            // for mv in &moves {
+            //     if start_time.elapsed() > maximum_time {
+            //         dbg!(searched_depth);
+            //         return best_stable_move;
+            //     }
 
-                let unmake_move = self.make_move(*mv);
+            //     let unmake_move = self.make_move(*mv);
 
-                let score = -self.alpha_beta(
-                    0,
-                    current_depth,
-                    -beta,
-                    -alpha,
-                    &mut tt,
-                    is_alpha_beta,
-                    is_tt,
-                    is_null_move_pruning,
-                    is_lmr,
-                    is_quiesense,
-                );
+            //     pv_len[0] = 0;
 
-                if score > best_score {
-                    best_score = score;
-                    best_move = *mv;
-                }
+            //     let score = -self.alpha_beta(
+            //         0,
+            //         current_depth,
+            //         -beta,
+            //         -alpha,
+            //         &mut tt,
+            //         &mut pv,
+            //         &mut pv_len,
+            //         is_alpha_beta,
+            //         is_tt,
+            //         is_null_move_pruning,
+            //         is_lmr,
+            //         is_quiesense,
+            //     );
 
-                alpha = alpha.max(score);
+            //     if score > best_score {
+            //         best_score = score;
+            //         best_move = *mv;
+            //     }
 
-                self.unmake_move(unmake_move);
-            }
+            //     alpha = alpha.max(score);
+
+            //     self.unmake_move(unmake_move);
+            // }
+
+            pv_len[0] = 0;
+
+            self.alpha_beta(
+                0,
+                current_depth,
+                -30_000,
+                30_000,
+                &mut tt,
+                &mut pv,
+                &mut pv_len,
+                is_alpha_beta,
+                is_tt,
+                is_null_move_pruning,
+                is_lmr,
+                is_quiesense,
+            );
+
+            let best_move = pv[0][0];
 
             if let Some(idx) = moves.iter().position(|m| *m == best_move) {
                 moves.swap(0, idx);
