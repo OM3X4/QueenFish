@@ -1457,7 +1457,7 @@ fn main() {
     let start_time = std::time::Instant::now();
 
     for (i, (fen, moves)) in fens.iter().enumerate() {
-        if i >= 50 {
+        if i >= 20 {
             break;
         }
         println!("test {}/{}", i + 1, fens.len());
@@ -1470,13 +1470,13 @@ fn main() {
         let inner_start_time = std::time::Instant::now();
 
         let best_move = board.engine(
-            20,
-            true,
-            true,
-            true,
+            10,
             true,
             false,
-            std::time::Duration::from_secs(3),
+            true,
+            true,
+            true,
+            600000_000_000,
         );
         dbg!((best_move.from(), best_move.to()));
         dbg!(best_move.to_uci());

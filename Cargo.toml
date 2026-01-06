@@ -28,10 +28,6 @@ name = "test_checkmate"
 path = "src/bin/test_checkmate.rs"
 
 [[bin]]
-name = "minimax"
-path = "src/bin/minimax.rs"
-
-[[bin]]
 name = "py_api"
 path = "src/bin/py_api.rs"
 

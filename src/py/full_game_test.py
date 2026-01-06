@@ -60,7 +60,7 @@ def stockfish_top_near_moves(
     engine,
     time_sec=3,
     max_moves=5,
-    threshold_cp=30,  # <-- 0.30 pawn window
+    threshold_cp=60,  # <-- 0.30 pawn window
 ):
     infos = engine.analyse(
         board,
@@ -79,13 +79,13 @@ def stockfish_top_near_moves(
 
         move = pv[0]
 
-        # Enforce constraints
-        if move.promotion is not None:
-            continue
-        if board.is_castling(move):
-            continue
-        if board.is_en_passant(move):
-            continue
+        # # Enforce constraints
+        # if move.promotion is not None:
+        #     continue
+        # if board.is_castling(move):
+        #     continue
+        # if board.is_en_passant(move):
+        #     continue
 
         eval_cp = score.pov(board.turn).score(mate_score=10_000)
         if eval_cp is None:
@@ -186,7 +186,7 @@ def play_game():
                 print(f"\nEngine plays: {mv.uci()}")
                 print("Stockfish top-5:", top_5)
 
-                if mv.uci() not in top_5:
+                if (mv.from_square , mv.to_square) not in top_5:
                     print("❌ MISMATCH DETECTED")
 
                 board.push(mv)
@@ -198,7 +198,8 @@ def play_game():
             else:
                 result = sf.play(
                     board,
-                    chess.engine.Limit(depth=STOCKFISH_DEPTH)
+                    chess.engine.Limit(time=2)
+                    # chess.engine.Limit(depth=STOCKFISH_DEPTH)
                 )
                 mv = result.move
                 print(f"\nStockfish plays: {mv.uci()}")
