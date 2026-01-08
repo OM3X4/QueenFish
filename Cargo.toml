@@ -54,3 +54,7 @@ path = "src/bin/perft.rs"
 [[bin]]
 name = "fens_test"
 path = "src/bin/fens_test.rs"
+
+[[bin]]
+name = "uci"
+path = "src/bin/uci.rs"

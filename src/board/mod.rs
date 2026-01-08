@@ -33,18 +33,18 @@ pub enum Bound {
 }
 
 const PIECE_VALUE: [i32; 12] = [
-    100, // WhitePawn
-    300, // WhiteKnight
-    300, // WhiteBishop
-    500, // WhiteRook
-    900, // WhiteQueen
-    0, // WhiteKing
+    100,  // WhitePawn
+    300,  // WhiteKnight
+    300,  // WhiteBishop
+    500,  // WhiteRook
+    900,  // WhiteQueen
+    0,    // WhiteKing
     -100, // BlackPawn
     -300, // BlackKnight
     -300, // BlackBishop
     -500, // BlackRook
     -900, // BlackQueen
-    0, // BlackKing
+    0,    // BlackKing
 ];
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -71,7 +71,7 @@ impl PieceType {
     pub fn value(self) -> i32 {
         unsafe { *PIECE_VALUE.get_unchecked(self as usize) }
     }
-    pub fn pst(&self , square : u8) -> i32 {
+    pub fn pst(&self, square: u8) -> i32 {
         match self.piece_index() {
             0 => PAWNS_BONUS[square as usize],
             1 => KING_BONUS[square as usize],
@@ -85,7 +85,7 @@ impl PieceType {
             9 => ROOK_BONUS[square as usize ^ 56],
             10 => QUEENS_BONUS[square as usize ^ 56],
             11 => KING_BONUS[square as usize ^ 56],
-            _ => 0
+            _ => 0,
         }
     }
 }
@@ -154,7 +154,7 @@ impl Move {
         s
     } //
     #[inline(always)]
-    pub fn from_uci(uci: &str, piece: PieceType, capture: bool) -> Move {
+    pub fn from_uci(uci: &str, board: &Board) -> Move {
         let bytes = uci.as_bytes();
 
         debug_assert!(bytes.len() >= 4);
@@ -165,15 +165,32 @@ impl Move {
 
         let file_to = bytes[2] - b'a';
         let rank_to = bytes[3] - b'1';
-        let to = rank_to * 8 + file_to;
+        let to: u8 = rank_to * 8 + file_to;
 
-        Move::new(from, to, piece, capture , false , false , false)
+        if let Some(en_passant) = board.en_passant {
+            if en_passant == to && board.piece_at[from as usize] == Some(PieceType::Pawn) {
+                let piece = board.piece_at[from as usize].unwrap();
+
+                return Move::new(from, to, piece, true, false, false, true);
+            }
+        }
+
+        let capture = board.piece_at[to as usize].is_some();
+        let piece = board.piece_at[from as usize].unwrap();
+
+        if piece == PieceType::BlackKing || piece == PieceType::WhiteKing {
+            if from.abs_diff(to) == 2 {
+                return Move::new(from, to, piece, false, true, false, false);
+            }
+        }
+
+        Move::new(from, to, piece, capture, false, false, false)
     } //
 
     #[inline(always)]
     pub fn is_castling(self) -> bool {
         ((self.0 >> 17) & 1) != 0
-    }//
+    } //
     #[inline(always)]
     pub fn is_en_passant(self) -> bool {
         ((self.0 >> 19) & 1) != 0
@@ -219,7 +236,7 @@ impl UnMakeMove {
             is_en_passant,
             castling,
             en_passant,
-            eval
+            eval,
         }
     }
 }
