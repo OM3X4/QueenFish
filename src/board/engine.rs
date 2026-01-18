@@ -604,13 +604,6 @@ impl Board {
         let mut best_move = moves[0];
         let mut tt = TranspositionTable::new(20);
 
-        const MAX_PLY: usize = 128;
-
-        let mut pv: [[Move; MAX_PLY]; MAX_PLY] =
-            [[Move::new(0, 0, PieceType::WhitePawn, false, false, false, false); MAX_PLY]; MAX_PLY];
-
-        let mut pv_len: [usize; MAX_PLY] = [0; MAX_PLY];
-
         for current_depth in 1..=max_depth {
             // dbg!(current_depth);
             let mut alpha = -30_000;
