@@ -617,8 +617,6 @@ impl Board {
             let beta = 30_000;
             let mut best_score = -30_000;
 
-            pv_len[0] = 0;
-
             self.alpha_beta(
                 0,
                 current_depth,
@@ -637,8 +635,6 @@ impl Board {
                 break;
             }
 
-            let best_move = pv[0][0];
-
             if let Some(idx) = moves.iter().position(|m| *m == best_move) {
                 moves.swap(0, idx);
             };
@@ -647,8 +643,8 @@ impl Board {
             best_stable_move = best_move;
         }
 
-        dbg!(searched_depth);
-        dbg!(NODE_COUNT.load(Ordering::Relaxed));
+        // dbg!(searched_depth);
+        // dbg!(NODE_COUNT.load(Ordering::Relaxed));
         return best_stable_move;
     } //
 
@@ -799,7 +795,7 @@ mod test {
         init_bishop_magics();
 
         let mut board = board::Board::new();
-        board.load_from_fen("1qr1k2r/1p2bp2/pBn1p3/P2pPbpp/5P2/2P1QBPP/1P1N3R/R4K2 b k -");
+        // board.load_from_fen("1qr1k2r/1p2bp2/pBn1p3/P2pPbpp/5P2/2P1QBPP/1P1N3R/R4K2 b k -");
 
         let start = std::time::Instant::now();
         // dbg!(
@@ -809,6 +805,8 @@ mod test {
         //         .map(|mv| mv.to_uci())
         //         .collect::<Vec<String>>()
         // );
+        let moves = board.generate_moves().iter().map(|mv| mv.to_uci()).collect::<Vec<String>>();
+        dbg!(moves);
         dbg!(
             board
                 .engine(6, true, false, false, false, false, 35_000_000)

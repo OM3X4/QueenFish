@@ -167,12 +167,17 @@ impl Move {
         let rank_to = bytes[3] - b'1';
         let to: u8 = rank_to * 8 + file_to;
 
+        // Handle en passant
         if let Some(en_passant) = board.en_passant {
-            let required_piece = board.
 
-            if en_passant == to {
-                let piece = board.piece_at[from as usize].unwrap();
+            let required_piece = match board.turn {
+                Turn::BLACK => PieceType::BlackPawn,
+                Turn::WHITE => PieceType::WhitePawn,
+            };
 
+            let piece = board.piece_at[from as usize].unwrap();
+
+            if en_passant == to && piece == required_piece {
                 return Move::new(from, to, piece, true, false, false, true);
             }
         }
@@ -180,10 +185,16 @@ impl Move {
         let capture = board.piece_at[to as usize].is_some();
         let piece = board.piece_at[from as usize].unwrap();
 
+
+        // Handle castling
         if piece == PieceType::BlackKing || piece == PieceType::WhiteKing {
             if from.abs_diff(to) == 2 {
                 return Move::new(from, to, piece, false, true, false, false);
             }
+        }
+
+        if uci.len() == 5 && (piece == PieceType::WhitePawn || piece == PieceType::BlackPawn) && (to > 55 || to < 8) {
+            return Move::new(from , to , piece , capture , false , true , false);
         }
 
         Move::new(from, to, piece, capture, false, false, false)
