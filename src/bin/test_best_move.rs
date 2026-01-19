@@ -1,4 +1,3 @@
-use std::time::Duration;
 
 fn main() {
     use bishop_magic::init_bishop_magics;
@@ -20,7 +19,7 @@ fn main() {
 
     // dbg!(board.turn);
     let start = std::time::Instant::now();
-    let best_move = board.engine(20 , true , false , true , false , false , 35_000_000);
+    let best_move = board.engine(20 , true , false , true , false , false ,false , std::time::Duration::from_secs(5));
     dbg!(start.elapsed());
     // let best_move_1 = board.engine(6 , 1 , true , false);
     // dbg!(best_move_1.to_uci());

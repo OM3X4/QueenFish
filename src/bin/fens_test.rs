@@ -1473,10 +1473,11 @@ fn main() {
             10,
             true,
             false,
-            true,
-            true,
-            true,
-            600000_000_000,
+            false,
+            false,
+            false,
+            false,
+            std::time::Duration::from_secs(5),
         );
         dbg!((best_move.from(), best_move.to()));
         dbg!(best_move.to_uci());

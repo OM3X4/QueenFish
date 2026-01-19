@@ -15,7 +15,7 @@ pub fn random_fen(min_moves: usize, max_moves: usize) -> Fen {
 
         let mv = board.legal_moves().into_iter().choose(&mut rng).unwrap();
 
-        board = board.play(mv).unwrap();
+        // board = board.play(mv).unwrap();
     }
 
     Fen::from_position(&board, shakmaty::EnPassantMode::Legal)
@@ -160,7 +160,7 @@ mod test {
 
             let start = std::time::Instant::now();
             let best_move_by_engine = board
-                .engine(16, true, false, true,false , false,  35_000_000)
+                .engine(16, true, false, true,false , false,  std::time::Duration::from_secs(5))
                 .to_uci();
             dbg!(start.elapsed());
 

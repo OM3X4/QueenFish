@@ -172,7 +172,11 @@ impl Board {
     /// Returns None if the position is not in the book.
     pub fn get_random_opening_move(&self) -> Option<&'static str> {
         // We fetch the slice of available moves
-        let moves = get_book_moves(&self.to_fen())?;
+        let fen = self.to_fen();
+        let mut parts = fen.split_whitespace().collect::<Vec<_>>();
+        parts.truncate(parts.len() - 2);
+
+        let moves = get_book_moves(&parts.join(" "))?;
 
         // We choose a random one
         let mut rng = rand::rng();
@@ -290,9 +294,12 @@ impl Board {
 
     pub fn quiescence(&mut self, alpha: i32, beta: i32) -> i32 {
         NODE_COUNT.fetch_add(1, Ordering::Relaxed);
-        let stand_pat = self.eval;
+        let stand_pat = match self.turn {
+            Turn::WHITE => self.eval,
+            Turn::BLACK => -self.eval,
+        };
 
-        let margin = 900; // queen value
+        let margin = 200; // queen value
 
         if stand_pat + margin < alpha {
             return alpha;
@@ -332,8 +339,7 @@ impl Board {
 
     pub fn alpha_beta(
         &mut self,
-        depth: i32,
-        max_depth: i32,
+        remaining_depth: i32,
         mut alpha: i32,
         beta: i32,
         tt: &mut TranspositionTable,
@@ -345,29 +351,18 @@ impl Board {
     ) -> i32 {
         NODE_COUNT.fetch_add(1, Ordering::Relaxed);
 
-        let nodes_count = NODE_COUNT.load(Ordering::Relaxed);
-
-        if nodes_count % 100_000_000 == 0 {
-            println!("Nodes: {}", nodes_count);
-        }
-
-        if nodes_count > MAXIMUM_NODE_COUNT.load(Ordering::Relaxed) {
-            return alpha;
-        }
-
-        let depth_remaining = max_depth - depth;
         let orig_alpha = alpha;
 
         // 1. TT LOOKUP
         if is_tt {
-            if let Some(score) = tt.probe(self.hash, depth_remaining as i8, alpha, beta) {
+            if let Some(score) = tt.probe(self.hash, remaining_depth as i8, alpha, beta) {
                 // println!("Skipping alpha-beta, found in TT");
                 return score;
             }
         };
 
         // 2. BASE CASE (Optimized)
-        if depth >= max_depth {
+        if remaining_depth == 0 {
             if is_quiesense {
                 return self.quiescence(alpha, beta);
             }
@@ -379,12 +374,11 @@ impl Board {
         };
 
         // 3. NULL MOVE PRUNING
-        if depth_remaining >= 3 && !self.is_king_in_check(self.turn) && is_null_move_pruning {
+        if remaining_depth >= 3 && !self.is_king_in_check(self.turn) && is_null_move_pruning {
             let r = 2;
             self.switch_turn();
             let score = -self.alpha_beta(
-                depth + r + 1,
-                max_depth,
+                remaining_depth - 2 - 1,
                 -beta + 1,
                 -beta,
                 tt,
@@ -415,7 +409,6 @@ impl Board {
 
         let opposite_turn = self.opposite_turn();
 
-        let remaining_depth = max_depth - depth;
         let remaining_depth_next = remaining_depth - 1;
 
         for (index, mv) in iter.enumerate() {
@@ -477,8 +470,7 @@ impl Board {
 
             if !can_lmr {
                 score = -self.alpha_beta(
-                    depth + 1,
-                    max_depth,
+                    remaining_depth - 1,
                     -beta,
                     -alpha,
                     tt,
@@ -491,32 +483,11 @@ impl Board {
             } else {
                 // Reduction
 
-                let mut reduction = 1;
-
-                // deeper search → larger reduction
-                if remaining_depth_next >= 6 {
-                    reduction += 1;
-                }
-
-                // later moves → larger reduction
-                if index >= 8 {
-                    reduction += 1;
-                }
-
-                // very late quiet moves
-                if index >= 16 {
-                    reduction += 1;
-                }
-
-                // cap reduction
-                reduction = reduction.min(remaining_depth_next - 1);
-
+                let reduction = 1;
                 let reduced_remaining = remaining_depth_next - reduction;
-                let reduced_max_depth = depth + 1 + reduced_remaining;
 
                 let reduced_score = -self.alpha_beta(
-                    depth + 1,
-                    reduced_max_depth,
+                    reduced_remaining,
                     -beta,
                     -alpha,
                     tt,
@@ -527,10 +498,9 @@ impl Board {
                     false,
                 );
 
-                if reduced_score >= beta {
+                if reduced_score >= alpha {
                     score = -self.alpha_beta(
-                        depth + 1,
-                        max_depth,
+                        remaining_depth - 1,
                         -beta,
                         -alpha,
                         tt,
@@ -548,10 +518,7 @@ impl Board {
             self.unmake_move(unmake_move);
 
             best_score = best_score.max(score);
-
-            if score > alpha {
-                alpha = score;
-            }
+            alpha = alpha.max(best_score);
 
             if alpha >= beta && is_alpha_beta {
                 break; // Alpha Cutoff
@@ -561,7 +528,7 @@ impl Board {
         if !found_legal {
             if self.is_king_in_check(self.turn) {
                 let mate = 30_000;
-                return -mate + depth;
+                return -mate - remaining_depth;
             } else {
                 return 0; // Stalemate
             }
@@ -570,14 +537,14 @@ impl Board {
         if is_tt {
             tt.store(
                 self.hash,
-                depth_remaining as i8,
+                remaining_depth as i8,
                 best_score,
                 orig_alpha,
                 beta,
             );
         };
 
-        return alpha;
+        return best_score;
     } //
 
     pub fn engine_singlethread(
@@ -588,12 +555,9 @@ impl Board {
         is_null_move_pruning: bool,
         is_lmr: bool,
         is_quiesense: bool,
-        maximum_nodes: u64,
+        is_move_ordering: bool,
+        maximum_time: Duration,
     ) -> Move {
-        // Setting maximum nodes
-        MAXIMUM_NODE_COUNT.store(maximum_nodes, Ordering::Relaxed);
-        NODE_COUNT.store(0, Ordering::Relaxed);
-
         let mut moves = self.generate_moves();
         partition_by_bool(&mut moves, |mv| mv.is_capture());
 
@@ -604,40 +568,68 @@ impl Board {
         let mut best_move = moves[0];
         let mut tt = TranspositionTable::new(20);
 
+        let mut root_moves = vec![];
+
+        moves.iter().for_each(|mv| root_moves.push((*mv, 0)));
+
         for current_depth in 1..=max_depth {
             // dbg!(current_depth);
             let mut alpha = -30_000;
             let beta = 30_000;
             let mut best_score = -30_000;
 
-            self.alpha_beta(
-                0,
-                current_depth,
-                -30_000,
-                30_000,
-                &mut tt,
-                is_alpha_beta,
-                is_tt,
-                is_null_move_pruning,
-                is_lmr,
-                is_quiesense,
-            );
+            for (mv, prev_score) in &mut root_moves {
+                if start_time.elapsed() > maximum_time {
+                    dbg!(searched_depth);
+                    return best_stable_move;
+                }
 
-            // Not take unstable search
-            if NODE_COUNT.load(Ordering::Relaxed) > maximum_nodes {
-                break;
+                let unmake_move = self.make_move(*mv);
+
+                let score = -self.alpha_beta(
+                    current_depth,
+                    -beta,
+                    -alpha,
+                    &mut tt,
+                    is_alpha_beta,
+                    is_tt,
+                    is_null_move_pruning,
+                    is_lmr,
+                    is_quiesense,
+                );
+
+                *prev_score = score;
+
+                if score > best_score {
+                    best_score = score;
+                    best_move = *mv;
+                }
+
+                alpha = alpha.max(score);
+
+                self.unmake_move(unmake_move);
+            } //
+
+            // if let Some(idx) = moves.iter().position(|m| *m == best_move) {
+            //     moves.swap(0, idx);
+            // };
+
+            if is_move_ordering {
+                root_moves.sort_by_key(|(_, score)| -*score);
             }
 
-            if let Some(idx) = moves.iter().position(|m| *m == best_move) {
-                moves.swap(0, idx);
-            };
+            // uci info print
+            println!(
+                "info depth {current_depth} score cp {best_score} pv {}",
+                best_move.to_uci()
+            );
 
             searched_depth = current_depth;
             best_stable_move = best_move;
         }
 
-        // dbg!(searched_depth);
-        // dbg!(NODE_COUNT.load(Ordering::Relaxed));
+        dbg!(searched_depth);
+        dbg!(NODE_COUNT.load(Ordering::Relaxed));
         return best_stable_move;
     } //
 
@@ -649,7 +641,8 @@ impl Board {
         is_null_move_pruning: bool,
         is_lmr: bool,
         is_quiesense: bool,
-        maximum_nodes: u64,
+        is_move_ordering: bool,
+        maximum_time: Duration,
     ) -> Move {
         if let Some(uci) = self.get_random_opening_move() {
             let bytes = uci.as_bytes();
@@ -682,7 +675,8 @@ impl Board {
             is_null_move_pruning,
             is_lmr,
             is_quiesense,
-            maximum_nodes,
+            is_move_ordering,
+            maximum_time,
         )
     } //
 
@@ -788,7 +782,7 @@ mod test {
         init_bishop_magics();
 
         let mut board = board::Board::new();
-        // board.load_from_fen("1qr1k2r/1p2bp2/pBn1p3/P2pPbpp/5P2/2P1QBPP/1P1N3R/R4K2 b k -");
+        board.load_from_fen("r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4 ");
 
         let start = std::time::Instant::now();
         // dbg!(
@@ -798,13 +792,17 @@ mod test {
         //         .map(|mv| mv.to_uci())
         //         .collect::<Vec<String>>()
         // );
-        let moves = board.generate_moves().iter().map(|mv| mv.to_uci()).collect::<Vec<String>>();
+        let moves = board
+            .generate_moves()
+            .iter()
+            .map(|mv| mv.to_uci())
+            .collect::<Vec<String>>();
         dbg!(moves);
-        dbg!(
-            board
-                .engine(6, true, false, false, false, false, 35_000_000)
-                .to_uci()
-        );
+        // dbg!(
+        //     board
+        //         .engine(64, true, false, true, true, false, std::time::Duration::from_millis(5000))
+        //         .to_uci()
+        // );
         dbg!(start.elapsed());
     } //
 }

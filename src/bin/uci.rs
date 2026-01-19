@@ -1,6 +1,6 @@
-use chess::board::Move;
 use chess::board::bishop_magic::init_bishop_magics;
 use chess::board::rook_magic::init_rook_magics;
+use chess::board::Move;
 use std::io::{self, Write};
 
 fn main() {
@@ -8,6 +8,15 @@ fn main() {
     init_rook_magics();
 
     let mut board = chess::board::Board::new();
+
+    let mut depth = 64;
+    let mut time = std::time::Duration::from_secs(30000);
+
+    let mut use_tt = true;
+    let mut use_lmr = true;
+    let mut use_null_move = true;
+    let mut use_q = true;
+    let mut use_move_ordering = true;
 
     loop {
         io::stdout().flush().unwrap();
@@ -24,6 +33,11 @@ fn main() {
             // Initialization
             println!("id name QueenFish 2.0 [Egypt]");
             println!("id author Omar Emad (om3x4)");
+            println!("option name UseTT type check default true");
+            println!("option name UseLMR type check default true");
+            println!("option name UseNullMove type check default true");
+            println!("option name UseQuiesense type check default true");
+            println!("option name UseMoveOrder type check default true");
             println!("uciok");
             io::stdout().flush().unwrap();
         } else if input == "isready" {
@@ -56,9 +70,19 @@ fn main() {
                 }
             }
             io::stdout().flush().unwrap();
+        } else if input.starts_with("setoption") {
+            if input.contains("UseTT") {
+                use_tt = input.contains("true");
+            } else if input.contains("UseLMR") {
+                use_lmr = input.contains("true");
+            } else if input.contains("UseNullMove") {
+                use_null_move = input.contains("true");
+            } else if input.contains("UseQuiesense") {
+                use_q = input.contains("true");
+            } else if input.contains("UseMoveOrder") {
+                use_move_ordering = input.contains("true");
+            }
         } else if input.starts_with("go") {
-            let mut depth = 64;
-            let mut nodes = 35_000_000;
             let args = input.split(' ').collect::<Vec<&str>>();
 
             let depth_parsed = args
@@ -66,17 +90,17 @@ fn main() {
                 .position(|&x| x == "depth")
                 .and_then(|i| args.get(i + 1));
 
-            let nodes_parsed = args
+            let time_parsed = args
                 .iter()
-                .position(|&x| x == "nodes")
+                .position(|&x| x == "movetime")
                 .and_then(|i| args.get(i + 1));
 
             if let Some(depth_str) = depth_parsed {
                 depth = depth_str.parse::<i32>().unwrap();
             }
 
-            if let Some(nodes_str) = nodes_parsed {
-                nodes = nodes_str.parse::<u64>().unwrap();
+            if let Some(time_str) = time_parsed {
+                time = std::time::Duration::from_millis(time_str.parse::<u64>().unwrap());
             }
 
             dbg!(board.to_fen());
@@ -84,7 +108,16 @@ fn main() {
             println!(
                 "bestmove {}",
                 board
-                    .engine(depth, true, false, true, true, false, nodes)
+                    .engine(
+                        depth,
+                        true,
+                        use_tt,
+                        use_null_move,
+                        use_lmr,
+                        use_q,
+                        use_move_ordering,
+                        time
+                    )
                     .to_uci()
             );
             io::stdout().flush().unwrap();
