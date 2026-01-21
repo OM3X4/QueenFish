@@ -18,6 +18,7 @@ pub struct TTEntry {
     pub depth: i8, // remaining depth
     pub bound: Bound,
     pub score: i32, // normalized score
+    pub best_move: Move,
 }
 pub struct TranspositionTable {
     table: Vec<Option<TTEntry>>,
@@ -25,7 +26,7 @@ pub struct TranspositionTable {
 }
 
 #[repr(u8)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone , PartialEq, Eq)]
 pub enum Bound {
     Exact = 0,
     Lower = 1,
@@ -150,6 +151,12 @@ impl Move {
         s.push((b'1' + rank_from) as char);
         s.push((b'a' + file_to) as char);
         s.push((b'1' + rank_to) as char);
+
+        if self.piece() == PieceType::WhitePawn && rank_to == 7 {
+            s.push('q');
+        } else if self.piece() == PieceType::BlackPawn && rank_to == 0 {
+            s.push('q');
+        }
 
         s
     } //

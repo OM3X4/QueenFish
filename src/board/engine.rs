@@ -31,23 +31,26 @@ impl TranspositionTable {
     } //
 
     #[inline(always)]
-    pub fn probe(&self, key: u64, depth: i8, alpha: i32, beta: i32) -> Option<i32> {
+    pub fn probe(&self, key: u64) -> Option<TTEntry> {
         let entry = self.table[self.index(key)]?;
 
-        if entry.key != key || entry.depth < depth {
+        if entry.key != key {
             return None;
         }
 
-        match entry.bound {
-            Bound::Exact => Some(entry.score),
-            Bound::Lower if entry.score >= beta => Some(entry.score),
-            Bound::Upper if entry.score <= alpha => Some(entry.score),
-            _ => None,
-        }
+        return Some(entry);
     } //
 
     #[inline(always)]
-    pub fn store(&mut self, key: u64, depth: i8, score: i32, alpha: i32, beta: i32) {
+    pub fn store(
+        &mut self,
+        key: u64,
+        depth: i8,
+        score: i32,
+        alpha: i32,
+        beta: i32,
+        best_move: Move,
+    ) {
         let bound = if score <= alpha {
             Bound::Upper
         } else if score >= beta {
@@ -65,6 +68,7 @@ impl TranspositionTable {
                     depth,
                     score,
                     bound,
+                    best_move,
                 });
             }
             Some(old) if depth >= old.depth => {
@@ -73,6 +77,7 @@ impl TranspositionTable {
                     depth,
                     score,
                     bound,
+                    best_move,
                 });
             }
             _ => {}
@@ -341,7 +346,7 @@ impl Board {
         &mut self,
         remaining_depth: i32,
         mut alpha: i32,
-        beta: i32,
+        mut beta: i32,
         tt: &mut TranspositionTable,
         is_alpha_beta: bool,
         is_tt: bool,
@@ -352,12 +357,31 @@ impl Board {
         NODE_COUNT.fetch_add(1, Ordering::Relaxed);
 
         let orig_alpha = alpha;
+        let orig_beta = beta;
+        let mut best_move_from_tt: Option<Move> = None;
 
         // 1. TT LOOKUP
+        // We will insert the move to the moves array and skip the same move if we found it in the main loop
         if is_tt {
-            if let Some(score) = tt.probe(self.hash, remaining_depth as i8, alpha, beta) {
-                // println!("Skipping alpha-beta, found in TT");
-                return score;
+            if let Some(entry) = tt.probe(self.hash) {
+                best_move_from_tt = Some(entry.best_move);
+
+                if entry.depth >= remaining_depth as i8 {
+                    match entry.bound {
+                        Bound::Exact => {
+                            return entry.score;
+                        }
+                        Bound::Lower => {
+                            alpha = alpha.max(entry.score);
+                        }
+                        Bound::Upper => {
+                            beta = beta.min(entry.score);
+                        }
+                    }
+                    if alpha >= beta {
+                        return alpha;
+                    }
+                }
             }
         };
 
@@ -379,8 +403,8 @@ impl Board {
             self.switch_turn();
             let score = -self.alpha_beta(
                 remaining_depth - 2 - 1,
-                -beta + 1,
                 -beta,
+                -(beta - 1),
                 tt,
                 is_alpha_beta,
                 false,
@@ -400,12 +424,18 @@ impl Board {
 
         self.sort_by_mvv_lva(&mut moves);
 
+        // Inserting the TT best move , didn't delete the original move (the same move) yet
+        if let Some(tt_mv) = best_move_from_tt {
+            moves.retain(|m| *m != tt_mv);
+            moves.insert(0, tt_mv);
+        }
 
         let iter = moves.iter();
 
         let mut found_legal = false;
 
         let mut best_score = -30_000;
+        let mut best_move = moves[0];
 
         let opposite_turn = self.opposite_turn();
 
@@ -517,7 +547,10 @@ impl Board {
 
             self.unmake_move(unmake_move);
 
-            best_score = best_score.max(score);
+            if score > best_score {
+                best_score = score;
+                best_move = *mv;
+            }
             alpha = alpha.max(best_score);
 
             if alpha >= beta && is_alpha_beta {
@@ -534,13 +567,14 @@ impl Board {
             }
         };
 
-        if is_tt {
+        if is_tt && best_score.abs() < 29_000 { // The Move isn't Mate
             tt.store(
                 self.hash,
                 remaining_depth as i8,
                 best_score,
                 orig_alpha,
-                beta,
+                orig_beta,
+                best_move
             );
         };
 
@@ -572,6 +606,8 @@ impl Board {
 
         moves.iter().for_each(|mv| root_moves.push((*mv, 0)));
 
+        // let mut pv = Vec::new();
+
         for current_depth in 1..=max_depth {
             // dbg!(current_depth);
             let mut alpha = -30_000;
@@ -587,7 +623,7 @@ impl Board {
                 let unmake_move = self.make_move(*mv);
 
                 let score = -self.alpha_beta(
-                    current_depth,
+                    current_depth - 1,
                     -beta,
                     -alpha,
                     &mut tt,
@@ -620,7 +656,8 @@ impl Board {
 
             // uci info print
             println!(
-                "info depth {current_depth} score cp {best_score} pv {}",
+                "info depth {current_depth} score cp {best_score} nodes {} pv {}",
+                NODE_COUNT.load(Ordering::Relaxed),
                 best_move.to_uci()
             );
 
@@ -644,29 +681,29 @@ impl Board {
         is_move_ordering: bool,
         maximum_time: Duration,
     ) -> Move {
-        if let Some(uci) = self.get_random_opening_move() {
-            let bytes = uci.as_bytes();
+        // if let Some(uci) = self.get_random_opening_move() {
+        //     let bytes = uci.as_bytes();
 
-            // Decode squares
-            let file_from = bytes[0] - b'a';
-            let rank_from = bytes[1] - b'1';
-            let from = (rank_from << 3) | file_from;
+        //     // Decode squares
+        //     let file_from = bytes[0] - b'a';
+        //     let rank_from = bytes[1] - b'1';
+        //     let from = (rank_from << 3) | file_from;
 
-            let file_to = bytes[2] - b'a';
-            let rank_to = bytes[3] - b'1';
-            let to = (rank_to << 3) | file_to;
+        //     let file_to = bytes[2] - b'a';
+        //     let rank_to = bytes[3] - b'1';
+        //     let to = (rank_to << 3) | file_to;
 
-            // Get moving piece from board
-            let piece = self.piece_at[from as usize]
-                .expect("Opening book move refers to empty from-square");
+        //     // Get moving piece from board
+        //     let piece = self.piece_at[from as usize]
+        //         .expect("Opening book move refers to empty from-square");
 
-            // Detect capture
-            let capture = self.piece_at[to as usize].is_some();
+        //     // Detect capture
+        //     let capture = self.piece_at[to as usize].is_some();
 
-            dbg!("Opening book move: {}", uci);
+        //     dbg!("Opening book move: {}", uci);
 
-            return Move::new(from, to, piece, capture, false, false, false);
-        };
+        //     return Move::new(from, to, piece, capture, false, false, false);
+        // };
 
         self.engine_singlethread(
             max_depth,
