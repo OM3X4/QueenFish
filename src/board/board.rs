@@ -1,7 +1,8 @@
 use super::constants::{RANK_1, RANK_2, RANK_7, RANK_8};
-use super::zobrist::Z_PIECE;
+use super::zobrist::{Z_PIECE , Z_SIDE};
 use super::{BitBoard, BitBoards, GameState, Turn};
 use crate::board::PieceType;
+
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Board {
@@ -362,7 +363,11 @@ impl Board {
         self.turn = match self.turn {
             Turn::BLACK => Turn::WHITE,
             Turn::WHITE => Turn::BLACK,
-        }
+        };
+
+        self.hash ^= *Z_SIDE;
+
+
     } //
 
     pub fn get_game_state(&mut self) -> GameState {
