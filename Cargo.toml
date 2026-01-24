@@ -36,3 +36,7 @@ path = "src/bin/perft.rs"
 [[bin]]
 name = "uci"
 path = "src/bin/uci.rs"
+
+[[bin]]
+name = "open"
+path = "src/bin/openings_generator.rs"

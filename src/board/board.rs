@@ -2,7 +2,9 @@ use super::constants::{RANK_1, RANK_2, RANK_7, RANK_8};
 use super::zobrist::{Z_PIECE , Z_SIDE};
 use super::{BitBoard, BitBoards, GameState, Turn};
 use crate::board::PieceType;
-
+use crate::board::openings::{OPENING_BOOK , BookEntry};
+use crate::board::Move;
+use rand::Rng;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Board {
@@ -440,4 +442,28 @@ impl Board {
         }
         println!("{}", board_string);
     } //
+
+    pub fn probe_opening(&self) -> Option<Move> {
+        let mut lo = 0;
+        let mut hi = OPENING_BOOK.len();
+
+        let hash = self.hash;
+
+        while lo < hi {
+            let mid = (lo + hi) >> 1;
+            let h = unsafe { OPENING_BOOK.get_unchecked(mid).hash };
+
+            if h == hash {
+                let moves =  unsafe { OPENING_BOOK.get_unchecked(mid).moves };
+                let mut rng = rand::thread_rng();
+                let index = rng.gen_range(0..moves.len());
+                return Some(Move(moves[index]));
+            } else if h < hash {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        None
+    }
 } //

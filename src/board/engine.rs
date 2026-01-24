@@ -720,29 +720,9 @@ impl Board {
         maximum_time: Duration,
         tt : Option<&mut TranspositionTable>,
     ) -> Move {
-        // if let Some(uci) = self.get_random_opening_move() {
-        //     let bytes = uci.as_bytes();
-
-        //     // Decode squares
-        //     let file_from = bytes[0] - b'a';
-        //     let rank_from = bytes[1] - b'1';
-        //     let from = (rank_from << 3) | file_from;
-
-        //     let file_to = bytes[2] - b'a';
-        //     let rank_to = bytes[3] - b'1';
-        //     let to = (rank_to << 3) | file_to;
-
-        //     // Get moving piece from board
-        //     let piece = self.piece_at[from as usize]
-        //         .expect("Opening book move refers to empty from-square");
-
-        //     // Detect capture
-        //     let capture = self.piece_at[to as usize].is_some();
-
-        //     dbg!("Opening book move: {}", uci);
-
-        //     return Move::new(from, to, piece, capture, false, false, false);
-        // };
+        if let Some(opening) = self.probe_opening() {
+            return opening;
+        }
 
         self.engine_singlethread(
             max_depth,

@@ -4,8 +4,8 @@ mod constants;
 mod engine;
 pub mod move_gen;
 pub mod rook_magic;
-mod test;
 mod zobrist;
+mod openings;
 
 pub use board::Board;
 
@@ -214,6 +214,9 @@ impl Move {
     #[inline(always)]
     pub fn is_en_passant(self) -> bool {
         ((self.0 >> 19) & 1) != 0
+    }
+    pub fn move_encoded(self) -> u32 {
+        self.0
     }
 } //
 
