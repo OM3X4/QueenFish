@@ -50,14 +50,30 @@ impl TranspositionTable {
         alpha: i32,
         beta: i32,
         best_move: Move,
+        all_searched: bool,
     ) {
-        let bound = if score <= alpha {
-            Bound::Upper
-        } else if score >= beta {
-            Bound::Lower
+        let bound = if !all_searched {
+            if score <= alpha {
+                Bound::Upper
+            } else {
+                Bound::Lower
+            }
         } else {
-            Bound::Exact
+            if score <= alpha {
+                Bound::Upper
+            } else if score >= beta {
+                Bound::Lower
+            } else {
+                Bound::Exact
+            }
         };
+        // let bound = if score <= alpha {
+        //     Bound::Upper
+        // } else if score >= beta {
+        //     Bound::Lower
+        // } else {
+        //     Bound::Exact
+        // };
 
         let idx = self.index(key);
 
@@ -188,55 +204,6 @@ impl Board {
         moves.choose(&mut rng).copied()
     } //
 
-    /// The score is turn agnostic , it always returns the score of the white player
-    pub fn pieces_score_old(&self) -> f32 {
-        let mut score: f32 = 0.0;
-        let num_of_knights = (self.bitboards.0[PieceType::WhiteKnight.piece_index()])
-            .0
-            .count_ones();
-        let num_of_pawns = self.bitboards.0[PieceType::WhitePawn.piece_index()]
-            .0
-            .count_ones();
-        let num_of_bishops = self.bitboards.0[PieceType::WhiteBishop.piece_index()]
-            .0
-            .count_ones();
-        let num_of_rooks = self.bitboards.0[PieceType::WhiteRook.piece_index()]
-            .0
-            .count_ones();
-        let num_of_queens = self.bitboards.0[PieceType::WhiteQueen.piece_index()]
-            .0
-            .count_ones();
-
-        let num_of_enemy_knights = self.bitboards.0[PieceType::BlackKnight.piece_index()]
-            .0
-            .count_ones();
-        let num_of_enemy_pawns = self.bitboards.0[PieceType::BlackPawn.piece_index()]
-            .0
-            .count_ones();
-        let num_of_enemy_bishops = self.bitboards.0[PieceType::BlackBishop.piece_index()]
-            .0
-            .count_ones();
-        let num_of_enemy_rooks = self.bitboards.0[PieceType::BlackRook.piece_index()]
-            .0
-            .count_ones();
-        let num_of_enemy_queens = self.bitboards.0[PieceType::BlackQueen.piece_index()]
-            .0
-            .count_ones();
-
-        score += (num_of_knights * 3) as f32;
-        score += (num_of_pawns * 1) as f32;
-        score += (num_of_bishops * 3) as f32;
-        score += (num_of_rooks * 5) as f32;
-        score += (num_of_queens * 9) as f32;
-
-        score -= (num_of_enemy_knights * 3) as f32;
-        score -= (num_of_enemy_pawns * 1) as f32;
-        score -= (num_of_enemy_bishops * 3) as f32;
-        score -= (num_of_enemy_rooks * 5) as f32;
-        score -= (num_of_enemy_queens * 9) as f32;
-        score
-    } //
-
     #[inline(always)]
     pub fn pieces_score(&self) -> i32 {
         let bbs = &self.bitboards.0;
@@ -258,7 +225,6 @@ impl Board {
 
     pub fn evaluate(&mut self) -> i32 {
         let mut score = self.pieces_score();
-        // score += self.development_score();
 
         if self.turn == Turn::BLACK {
             return -score;
@@ -296,6 +262,40 @@ impl Board {
 
         // Quiet moves stay untouched
     } //
+
+    pub fn score_move(
+        &self,
+        mv: Move,
+        ply: usize,
+        killer: &[[Option<Move>; 2]],
+        tt_move: Option<Move>,
+    ) -> i32 {
+        if Some(mv) == tt_move {
+            10_000
+        } else if Some(mv) == killer[ply][0] {
+            9_000
+        } else if Some(mv) == killer[ply][1] {
+            8_000
+        } else if mv.is_capture() {
+            10_000 + self.mvv_lva(mv)
+        } else {
+            0
+        }
+    }
+
+    pub fn sort_moves_by_score(
+        &mut self,
+        moves: &mut SmallVec<[Move; 256]>,
+        ply: usize,
+        killer: &[[Option<Move>; 2]],
+        tt_move: Option<Move>,
+    ) {
+        moves.sort_unstable_by(|a, b| {
+            let va = self.score_move(*a, ply, killer, tt_move);
+            let vb = self.score_move(*b, ply, killer, tt_move);
+            vb.cmp(&va)
+        });
+    }
 
     pub fn quiescence(&mut self, alpha: i32, beta: i32) -> i32 {
         NODE_COUNT.fetch_add(1, Ordering::Relaxed);
@@ -344,6 +344,7 @@ impl Board {
 
     pub fn alpha_beta(
         &mut self,
+        ply: i32,
         remaining_depth: i32,
         mut alpha: i32,
         mut beta: i32,
@@ -353,6 +354,7 @@ impl Board {
         is_null_move_pruning: bool,
         is_lmr: bool,
         is_quiesense: bool,
+        killer_moves: &mut [[Option<Move>; 2]; 128],
     ) -> i32 {
         NODE_COUNT.fetch_add(1, Ordering::Relaxed);
 
@@ -365,7 +367,6 @@ impl Board {
         let mut best_move_from_tt: Option<Move> = None;
 
         // 1. TT LOOKUP
-        // We will insert the move to the moves array and skip the same move if we found it in the main loop
         if is_tt {
             if let Some(entry) = tt.probe(self.hash) {
                 best_move_from_tt = Some(entry.best_move);
@@ -373,7 +374,12 @@ impl Board {
                 if entry.depth >= remaining_depth as i8 {
                     match entry.bound {
                         Bound::Exact => {
-                            return entry.score;
+                            let score = if entry.score.abs() > 29_000 {
+                                entry.score - ply
+                            } else {
+                                entry.score
+                            };
+                            return score;
                         }
                         Bound::Lower => {
                             alpha = alpha.max(entry.score);
@@ -406,6 +412,7 @@ impl Board {
             let r = 2;
             self.switch_turn();
             let score = -self.alpha_beta(
+                ply + 1,
                 remaining_depth - 2 - 1,
                 -beta,
                 -(beta - 1),
@@ -415,6 +422,7 @@ impl Board {
                 false,
                 false,
                 false,
+                killer_moves,
             );
             self.switch_turn();
             if score >= beta {
@@ -426,17 +434,12 @@ impl Board {
         let mut moves = SmallVec::new();
         self.generate_pesudo_moves(&mut moves);
 
-        self.sort_by_mvv_lva(&mut moves);
-
-        // Inserting the TT best move , didn't delete the original move (the same move) yet
-        if let Some(tt_mv) = best_move_from_tt {
-            moves.retain(|m| *m != tt_mv);
-            moves.insert(0, tt_mv);
-        }
+        self.sort_moves_by_score(&mut moves, ply as usize, killer_moves, best_move_from_tt);
 
         let iter = moves.iter();
 
         let mut found_legal = false;
+        let mut all_searched = true;
 
         let mut best_score = -30_000;
         let mut best_move = moves[0];
@@ -504,6 +507,7 @@ impl Board {
 
             if !can_lmr {
                 score = -self.alpha_beta(
+                    ply + 1,
                     remaining_depth - 1,
                     -beta,
                     -alpha,
@@ -513,14 +517,17 @@ impl Board {
                     is_null_move_pruning,
                     is_lmr,
                     is_quiesense,
+                    killer_moves,
                 );
             } else {
                 // Reduction
+                all_searched = false;
 
-                let reduction = 1;
+                let reduction = if remaining_depth >= 6 { 2 } else { 1 };
                 let reduced_remaining = remaining_depth_next - reduction;
 
                 let reduced_score = -self.alpha_beta(
+                    ply + 1,
                     reduced_remaining,
                     -beta,
                     -alpha,
@@ -530,10 +537,12 @@ impl Board {
                     is_null_move_pruning,
                     is_lmr,
                     false,
+                    killer_moves,
                 );
 
                 if reduced_score >= alpha {
                     score = -self.alpha_beta(
+                        ply + 1,
                         remaining_depth - 1,
                         -beta,
                         -alpha,
@@ -543,6 +552,7 @@ impl Board {
                         is_null_move_pruning,
                         is_lmr,
                         is_quiesense,
+                        killer_moves,
                     );
                 } else {
                     score = reduced_score;
@@ -558,6 +568,17 @@ impl Board {
             alpha = alpha.max(best_score);
 
             if alpha >= beta && is_alpha_beta {
+                if !mv.is_capture() {
+                    if let Some(killer_move_1) = killer_moves[ply as usize][0] {
+                        if *mv != killer_move_1 {
+                            killer_moves[ply as usize][1] = Some(killer_move_1);
+                            killer_moves[ply as usize][0] = Some(*mv);
+                        }
+                    } else {
+                        killer_moves[ply as usize][0] = Some(*mv);
+                    }
+                }
+                all_searched = false;
                 break; // Alpha Cutoff
             }
         } //
@@ -565,20 +586,28 @@ impl Board {
         if !found_legal {
             if self.is_king_in_check(self.turn) {
                 let mate = 30_000;
-                return -mate - remaining_depth;
+                best_score = -mate - remaining_depth;
             } else {
-                return 0; // Stalemate
+                best_score = 0; // Stalemate
             }
         };
 
-        if is_tt && best_score.abs() < 29_000 { // The Move isn't Mate
+        let tt_score = if best_score.abs() > 29_000 {
+            best_score + ply
+        } else {
+            best_score
+        };
+
+        if is_tt {
+            // The Move isn't Mate
             tt.store(
                 self.hash,
                 remaining_depth as i8,
-                best_score,
+                tt_score,
                 orig_alpha,
                 orig_beta,
-                best_move
+                best_move,
+                all_searched,
             );
         };
 
@@ -605,15 +634,13 @@ impl Board {
         let mut best_stable_move = moves[0];
         let mut best_move = moves[0];
         let mut tt = TranspositionTable::new(20);
+        let mut killer_moves: [[Option<Move>; 2]; 128] = [[None; 2]; 128];
 
         let mut root_moves = vec![];
 
         moves.iter().for_each(|mv| root_moves.push((*mv, 0)));
 
-        // let mut pv = Vec::new();
-
         for current_depth in 1..=max_depth {
-            // dbg!(current_depth);
             let mut alpha = -30_000;
             let beta = 30_000;
             let mut best_score = -30_000;
@@ -627,6 +654,7 @@ impl Board {
                 let unmake_move = self.make_move(*mv);
 
                 let score = -self.alpha_beta(
+                    1,
                     current_depth - 1,
                     -beta,
                     -alpha,
@@ -636,6 +664,7 @@ impl Board {
                     is_null_move_pruning,
                     is_lmr,
                     is_quiesense,
+                    &mut killer_moves,
                 );
 
                 *prev_score = score;
@@ -650,18 +679,15 @@ impl Board {
                 self.unmake_move(unmake_move);
             } //
 
-            // if let Some(idx) = moves.iter().position(|m| *m == best_move) {
-            //     moves.swap(0, idx);
-            // };
-
             if is_move_ordering {
                 root_moves.sort_by_key(|(_, score)| -*score);
             }
 
             // uci info print
             println!(
-                "info depth {current_depth} score cp {best_score} nodes {} pv {}",
+                "info depth {current_depth} score cp {best_score} nodes {} time {} pv {}",
                 NODE_COUNT.load(Ordering::Relaxed),
+                start_time.elapsed().as_millis(),
                 best_move.to_uci()
             );
 
@@ -835,7 +861,6 @@ mod test {
         board.make_move(Move::from_uci("f6g8", &board));
         dbg!(&board.history);
         // board.make_move(Move::from_uci("f6g8", &board));
-
 
         let start = std::time::Instant::now();
         // dbg!(
