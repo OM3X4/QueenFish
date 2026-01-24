@@ -24,36 +24,14 @@ lto = "fat"
 codegen-units = 1
 
 [[bin]]
-name = "test_checkmate"
-path = "src/bin/test_checkmate.rs"
-
-[[bin]]
-name = "py_api"
-path = "src/bin/py_api.rs"
-
-[[bin]]
-name = "magics"
-path = "src/bin/test_magics.rs"
-
-[[bin]]
 name = "test_best_move"
 path = "src/bin/test_best_move.rs"
 
-[[bin]]
-name = "engine_perft"
-path = "src/bin/engine_perft.rs"
-
-[[bin]]
-name = "moves_generation_perft"
-path = "src/bin/moves_generation_perft.rs"
 
 [[bin]]
 name = "perft"
 path = "src/bin/perft.rs"
 
-[[bin]]
-name = "fens_test"
-path = "src/bin/fens_test.rs"
 
 [[bin]]
 name = "uci"
