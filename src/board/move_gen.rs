@@ -779,7 +779,9 @@ impl Board {
             is_castling: mv.is_castling(),
             castling: self.castling,
             en_passant: self.en_passant,
-            eval: self.eval,
+            mat_eval: self.mat_eval,
+            eg_eval: self.eg_pst_eval,
+            mg_eval: self.mg_pst_eval,
             last_irreversible_move: self.last_irreversible_move,
         };
 
@@ -1017,16 +1019,13 @@ impl Board {
         self.switch_turn();
         self.castling = unmake_move.castling;
         self.en_passant = unmake_move.en_passant;
-        self.eval = unmake_move.eval;
+        self.mat_eval = unmake_move.mat_eval;
+        self.eg_pst_eval = unmake_move.eg_eval;
+        self.mg_pst_eval = unmake_move.mg_eval;
         self.hash = unmake_move.hash;
         self.occupied = unmake_move.occupied;
         self.history.pop();
         self.last_irreversible_move = unmake_move.last_irreversible_move;
-        // self.occupied = unmake_move.occupied;
-        // self.hash = unmake_move.hash;
-        // self.occupied = self.get_all_bits();
-        // self.piece_at = self.generate_piece_at();
-        // assert_eq!(self.piece_at, self.generate_piece_at());
     } //
 } //
 

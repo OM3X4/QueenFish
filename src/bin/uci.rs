@@ -48,6 +48,7 @@ fn main() {
         } else if input == "ucinewgame" {
             // println!("ok");
             board.reset_to_default();
+            tt = TranspositionTable::new(20);
         } else if input.starts_with("position") {
             let tokens: Vec<&str> = input.split_whitespace().collect();
 
@@ -121,7 +122,7 @@ fn main() {
                         use_q,
                         use_move_ordering,
                         time,
-                        None
+                        Some(&mut tt)
                     )
                     .to_uci()
             );

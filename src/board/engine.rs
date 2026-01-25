@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use crate::board::constants::{RANK_1, RANK_8};
 
-use super::constants::{MVV_LVA, get_book_moves};
+use super::constants::{MVV_LVA};
 use super::zobrist::{Z_CASTLING, Z_PIECE, Z_SIDE};
 use super::{Board, Bound, Move, PieceType, TTEntry, TranspositionTable, Turn};
 
@@ -133,15 +133,6 @@ fn partition_captures<T>(v: &mut [T], mut pred: impl FnMut(&T) -> bool) -> usize
 }
 
 impl Board {
-    #[inline]
-    pub fn splitmix64(seed: &mut u64) -> u64 {
-        *seed = seed.wrapping_add(0x9E3779B97F4A7C15);
-        let mut z = *seed;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
-        z ^ (z >> 31)
-    } //
-
     pub fn compute_hash(&self) -> u64 {
         let mut h = 0u64;
 
@@ -189,20 +180,6 @@ impl Board {
         h
     } //
 
-    /// Returns a random move from the opening book for a given FEN string.
-    /// Returns None if the position is not in the book.
-    pub fn get_random_opening_move(&self) -> Option<&'static str> {
-        // We fetch the slice of available moves
-        let fen = self.to_fen();
-        let mut parts = fen.split_whitespace().collect::<Vec<_>>();
-        parts.truncate(parts.len() - 2);
-
-        let moves = get_book_moves(&parts.join(" "))?;
-
-        // We choose a random one
-        let mut rng = rand::rng();
-        moves.choose(&mut rng).copied()
-    } //
 
     #[inline(always)]
     pub fn pieces_score(&self) -> i32 {
@@ -224,11 +201,16 @@ impl Board {
     } //
 
     pub fn evaluate(&mut self) -> i32 {
-        let mut score = self.pieces_score();
+        const MAX_PHASE: i32 = 16;
 
-        if self.turn == Turn::BLACK {
-            return -score;
-        }
+        let mut phase = (self.number_of_pieces - self.number_of_pawns) as i32 * MAX_PHASE / 14;
+
+        phase = phase.clamp(0, MAX_PHASE);
+
+        let pst_score = (self.mg_pst_eval * phase + self.eg_pst_eval * (MAX_PHASE - phase)) / MAX_PHASE;
+
+        let mut score = self.mat_eval + pst_score;
+
         score
     } //
 
@@ -300,8 +282,8 @@ impl Board {
     pub fn quiescence(&mut self, alpha: i32, beta: i32) -> i32 {
         NODE_COUNT.fetch_add(1, Ordering::Relaxed);
         let stand_pat = match self.turn {
-            Turn::WHITE => self.eval,
-            Turn::BLACK => -self.eval,
+            Turn::WHITE => self.evaluate(),
+            Turn::BLACK => -self.evaluate(),
         };
 
         let margin = 900; // queen value
@@ -401,10 +383,9 @@ impl Board {
             if is_quiesense {
                 return self.quiescence(alpha, beta);
             }
-            // return self.evaluate();
             match self.turn {
-                Turn::BLACK => return -self.eval,
-                Turn::WHITE => return self.eval,
+                Turn::BLACK => return -self.evaluate(),
+                Turn::WHITE => return self.evaluate(),
             }
         };
 

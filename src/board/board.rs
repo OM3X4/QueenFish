@@ -1,10 +1,11 @@
 use super::constants::{RANK_1, RANK_2, RANK_7, RANK_8};
-use super::zobrist::{Z_PIECE , Z_SIDE};
+use super::zobrist::{Z_PIECE, Z_SIDE};
 use super::{BitBoard, BitBoards, GameState, Turn};
-use crate::board::PieceType;
-use crate::board::openings::{OPENING_BOOK , BookEntry};
 use crate::board::Move;
+use crate::board::PieceType;
+use crate::board::openings::{BookEntry, OPENING_BOOK};
 use rand::Rng;
+use rand::rand_core::le;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Board {
@@ -15,10 +16,13 @@ pub struct Board {
     pub hash: u64,
     pub en_passant: Option<u8>,
     pub castling: u8,
-    pub eval: i32, // Always white favor
     pub history: Vec<u64>,
     pub last_irreversible_move: u64,
-    pub number_of_pieces: u32
+    pub mat_eval: i32,    // Always white favor
+    pub mg_pst_eval: i32, // Always white favor
+    pub eg_pst_eval: i32, // Always white favor
+    pub number_of_pieces: u32,
+    pub number_of_pawns: u32,
 }
 
 impl Board {
@@ -31,16 +35,22 @@ impl Board {
             occupied: BitBoard(RANK_1 | RANK_2 | RANK_7 | RANK_8),
             en_passant: None,
             castling: 15,
-            eval: 0,
+            mat_eval: 0,
+            mg_pst_eval: 0,
+            eg_pst_eval: 0,
             history: Vec::new(),
             last_irreversible_move: 0,
-            number_of_pieces: 0
+            number_of_pieces: 0,
+            number_of_pawns: 0,
         };
 
         board.piece_at = board.generate_piece_at();
         board.hash = board.compute_hash();
-        board.eval = board.evaluate();
         board.history = vec![board.hash];
+        board.mat_eval = board.pieces_score();
+        let (mg_score, eg_score) = board.generate_pst_score();
+        board.mg_pst_eval = mg_score;
+        board.eg_pst_eval = eg_score;
 
         board
     } //
@@ -53,8 +63,11 @@ impl Board {
         self.turn = Turn::WHITE;
         self.en_passant = None;
         self.castling = 15;
-        self.eval = 0;
+        self.mat_eval = 0;
+        self.eg_pst_eval = 0;
+        self.mg_pst_eval = 0;
         self.number_of_pieces = 32;
+        self.number_of_pawns = 16;
         self.history = vec![self.hash];
     } //
     pub fn reset_to_zero(&mut self) {
@@ -65,7 +78,10 @@ impl Board {
         self.turn = Turn::WHITE;
         self.en_passant = None;
         self.castling = 0;
-        self.eval = 0;
+        self.mat_eval = 0;
+        self.eg_pst_eval = 0;
+        self.mg_pst_eval = 0;
+        self.number_of_pawns = 0;
         self.number_of_pieces = 0;
         self.history = vec![self.hash];
     } //
@@ -140,9 +156,13 @@ impl Board {
         self.bitboards.0[piece.piece_index()].0 |= mask;
         self.occupied.0 |= mask;
         self.piece_at[sq as usize] = Some(piece);
-        self.eval += piece.value();
-        self.eval += piece.pst(sq);
+        self.mat_eval += piece.value();
+        self.eg_pst_eval += piece.pst(sq, true);
+        self.mg_pst_eval += piece.pst(sq, false);
         self.number_of_pieces += 1;
+        if piece == PieceType::WhitePawn || piece == PieceType::BlackPawn {
+            self.number_of_pawns += 1;
+        }
 
         self.hash ^= Z_PIECE[piece.piece_index()][sq as usize];
     } //
@@ -153,10 +173,13 @@ impl Board {
         self.bitboards.0[piece.piece_index()].0 &= !mask;
         self.occupied.0 &= !mask;
         self.piece_at[sq as usize] = None;
-        self.eval -= piece.value();
-        self.eval -= piece.pst(sq);
+        self.mat_eval -= piece.value();
+        self.eg_pst_eval -= piece.pst(sq, true);
+        self.mg_pst_eval -= piece.pst(sq, false);
         self.number_of_pieces -= 1;
-
+        if piece == PieceType::WhitePawn || piece == PieceType::BlackPawn {
+            self.number_of_pawns -= 1;
+        }
 
         self.hash ^= Z_PIECE[piece.piece_index()][sq as usize];
     } //
@@ -249,9 +272,15 @@ impl Board {
         self.occupied = self.get_all_bits();
         self.piece_at = self.generate_piece_at();
         self.hash = self.compute_hash();
-        self.eval = self.evaluate();
+
+        self.mat_eval = self.pieces_score();
+        let (mg_score, eg_score) = self.generate_pst_score();
+        self.mg_pst_eval = mg_score;
+        self.eg_pst_eval = eg_score;
+
         self.history = vec![self.hash];
         self.number_of_pieces = self.generate_pieces_count();
+        self.number_of_pawns = self.generate_pawns_count();
     } //
 
     pub fn to_fen(&self) -> String {
@@ -368,8 +397,6 @@ impl Board {
         };
 
         self.hash ^= *Z_SIDE;
-
-
     } //
 
     pub fn get_game_state(&mut self) -> GameState {
@@ -392,7 +419,6 @@ impl Board {
     } //
 
     pub fn is_3fold_repetition(&self) -> bool {
-
         let hash = self.hash;
 
         let mut count = 0;
@@ -454,7 +480,7 @@ impl Board {
             let h = unsafe { OPENING_BOOK.get_unchecked(mid).hash };
 
             if h == hash {
-                let moves =  unsafe { OPENING_BOOK.get_unchecked(mid).moves };
+                let moves = unsafe { OPENING_BOOK.get_unchecked(mid).moves };
                 let mut rng = rand::thread_rng();
                 let index = rng.gen_range(0..moves.len());
                 return Some(Move(moves[index]));
@@ -465,7 +491,19 @@ impl Board {
             }
         }
         None
-    }//
+    } //
+
+    pub fn generate_pst_score(&self) -> (i32, i32) {
+        let mut eg_score = 0;
+        let mut mg_score = 0;
+        for (sq, piece) in self.piece_at.iter().enumerate() {
+            if let Some(piece) = piece {
+                eg_score += piece.pst(sq as u8, true);
+                mg_score += piece.pst(sq as u8, false);
+            }
+        }
+        return (mg_score, eg_score);
+    } //
 
     pub fn generate_pieces_count(&self) -> u32 {
         let mut count = 0;
@@ -475,5 +513,17 @@ impl Board {
             }
         }
         return count;
-    }
+    } //
+
+    pub fn generate_pawns_count(&self) -> u32 {
+        let mut count = 0;
+        for i in 0..64 {
+            if self.piece_at(i) == Some(PieceType::WhitePawn)
+                || self.piece_at(i) == Some(PieceType::BlackPawn)
+            {
+                count += 1;
+            }
+        }
+        return count;
+    } //
 } //

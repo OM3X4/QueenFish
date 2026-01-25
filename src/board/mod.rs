@@ -3,13 +3,17 @@ pub mod board;
 mod constants;
 mod engine;
 pub mod move_gen;
+mod openings;
 pub mod rook_magic;
 mod zobrist;
-mod openings;
 
 pub use board::Board;
 
-use crate::board::constants::{BISHOPS_BONUS, KING_BONUS, PAWNS_BONUS, QUEENS_BONUS, ROOK_BONUS};
+// use crate::board::constants::{BISHOPS_BONUS, KING_BONUS, PAWNS_BONUS, QUEENS_BONUS, ROOK_BONUS};
+use crate::board::constants::{
+    EG_BISHOP_TABLE, EG_KING_TABLE, EG_PAWN_TABLE, EG_QUEEN_TABLE, EG_ROOK_TABLE,
+    MG_BISHOP_TABLE, MG_KING_TABLE, MG_PAWN_TABLE, MG_QUEEN_TABLE, MG_ROOK_TABLE,
+};
 
 #[derive(Copy, Clone)]
 
@@ -26,7 +30,7 @@ pub struct TranspositionTable {
 }
 
 #[repr(u8)]
-#[derive(Copy, Clone , PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum Bound {
     Exact = 0,
     Lower = 1,
@@ -72,22 +76,58 @@ impl PieceType {
     pub fn value(self) -> i32 {
         unsafe { *PIECE_VALUE.get_unchecked(self as usize) }
     }
-    pub fn pst(&self, square: u8) -> i32 {
-        match self.piece_index() {
-            0 => PAWNS_BONUS[square as usize],
-            1 => KING_BONUS[square as usize],
-            2 => BISHOPS_BONUS[square as usize],
-            3 => ROOK_BONUS[square as usize],
-            4 => QUEENS_BONUS[square as usize],
-            5 => KING_BONUS[square as usize],
-            6 => PAWNS_BONUS[square as usize ^ 56],
-            7 => KING_BONUS[square as usize ^ 56],
-            8 => BISHOPS_BONUS[square as usize ^ 56],
-            9 => ROOK_BONUS[square as usize ^ 56],
-            10 => QUEENS_BONUS[square as usize ^ 56],
-            11 => KING_BONUS[square as usize ^ 56],
-            _ => 0,
+    // pub fn pst(&self, square: u8) -> i32 {
+    //     match self.piece_index() {
+    //         0 => PAWNS_BONUS[square as usize],
+    //         1 => KING_BONUS[square as usize],
+    //         2 => BISHOPS_BONUS[square as usize],
+    //         3 => ROOK_BONUS[square as usize],
+    //         4 => QUEENS_BONUS[square as usize],
+    //         5 => KING_BONUS[square as usize],
+    //         6 => PAWNS_BONUS[square as usize ^ 56],
+    //         7 => KING_BONUS[square as usize ^ 56],
+    //         8 => BISHOPS_BONUS[square as usize ^ 56],
+    //         9 => ROOK_BONUS[square as usize ^ 56],
+    //         10 => QUEENS_BONUS[square as usize ^ 56],
+    //         11 => KING_BONUS[square as usize ^ 56],
+    //         _ => 0,
+    //     }
+    // }
+    pub fn pst(&self, square: u8, is_eg: bool) -> i32 {
+        if is_eg {
+            return match self.piece_index() {
+                0 => EG_PAWN_TABLE[square as usize],
+                1 => EG_KING_TABLE[square as usize],
+                2 => EG_BISHOP_TABLE[square as usize],
+                3 => EG_ROOK_TABLE[square as usize],
+                4 => EG_QUEEN_TABLE[square as usize],
+                5 => EG_KING_TABLE[square as usize],
+                6 => -EG_PAWN_TABLE[square as usize ^ 56],
+                7 => -EG_KING_TABLE[square as usize ^ 56],
+                8 => -EG_BISHOP_TABLE[square as usize ^ 56],
+                9 => -EG_ROOK_TABLE[square as usize ^ 56],
+                10 => -EG_QUEEN_TABLE[square as usize ^ 56],
+                11 => -EG_KING_TABLE[square as usize ^ 56],
+                _ => 0,
+            };
+        } else {
+            return match self.piece_index() {
+                0 => MG_PAWN_TABLE[square as usize],
+                1 => MG_KING_TABLE[square as usize],
+                2 => MG_BISHOP_TABLE[square as usize],
+                3 => MG_ROOK_TABLE[square as usize],
+                4 => MG_QUEEN_TABLE[square as usize],
+                5 => MG_KING_TABLE[square as usize],
+                6 => -MG_PAWN_TABLE[square as usize ^ 56],
+                7 => -MG_KING_TABLE[square as usize ^ 56],
+                8 => -MG_BISHOP_TABLE[square as usize ^ 56],
+                9 => -MG_ROOK_TABLE[square as usize ^ 56],
+                10 => -MG_QUEEN_TABLE[square as usize ^ 56],
+                11 => -MG_KING_TABLE[square as usize ^ 56],
+                _ => 0,
+            };
         }
+        0
     }
 }
 
@@ -176,7 +216,6 @@ impl Move {
 
         // Handle en passant
         if let Some(en_passant) = board.en_passant {
-
             let required_piece = match board.turn {
                 Turn::BLACK => PieceType::BlackPawn,
                 Turn::WHITE => PieceType::WhitePawn,
@@ -192,7 +231,6 @@ impl Move {
         let capture = board.piece_at[to as usize].is_some();
         let piece = board.piece_at[from as usize].unwrap();
 
-
         // Handle castling
         if piece == PieceType::BlackKing || piece == PieceType::WhiteKing {
             if from.abs_diff(to) == 2 {
@@ -200,8 +238,11 @@ impl Move {
             }
         }
 
-        if uci.len() == 5 && (piece == PieceType::WhitePawn || piece == PieceType::BlackPawn) && (to > 55 || to < 8) {
-            return Move::new(from , to , piece , capture , false , true , false);
+        if uci.len() == 5
+            && (piece == PieceType::WhitePawn || piece == PieceType::BlackPawn)
+            && (to > 55 || to < 8)
+        {
+            return Move::new(from, to, piece, capture, false, true, false);
         }
 
         Move::new(from, to, piece, capture, false, false, false)
@@ -231,7 +272,9 @@ pub struct UnMakeMove {
     hash: u64,
     castling: u8,
     en_passant: Option<u8>,
-    eval: i32,
+    mat_eval: i32,
+    eg_eval: i32,
+    mg_eval: i32,
     last_irreversible_move: u64,
 }
 
@@ -247,7 +290,9 @@ impl UnMakeMove {
         hash: u64,
         castling: u8,
         en_passant: Option<u8>,
-        eval: i32,
+        mat_eval: i32,
+        eg_eval: i32,
+        mg_eval: i32,
         last_irreversible_move: u64,
     ) -> UnMakeMove {
         UnMakeMove {
@@ -261,7 +306,9 @@ impl UnMakeMove {
             is_en_passant,
             castling,
             en_passant,
-            eval,
+            mat_eval,
+            eg_eval,
+            mg_eval,
             last_irreversible_move,
         }
     }

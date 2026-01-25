@@ -114,7 +114,7 @@ def perft(board: chess.Board, depth: int , max_depth: int , engine) -> int:
         moves_num = 2
 
 
-    moves = stockfish_top_near_moves(board, engine, time_sec=3, max_moves=5, threshold_cp=60)
+    moves = stockfish_top_near_moves(board, engine, time_sec=3, max_moves=10, threshold_cp=60)
     # moves = stockfish_top(board, engine, time_sec=0.2 , number_of_moves=moves_num)
 
     moves = [chess.Move(m[0], m[1]) for m in moves]
