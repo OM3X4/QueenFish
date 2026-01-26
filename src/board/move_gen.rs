@@ -415,9 +415,6 @@ impl Board {
 
     #[inline(always)]
     pub fn generate_pesudo_moves(&self, mut moves: &mut SmallVec<[Move; 256]>) {
-        if self.to_fen() == "4r3/1pkb4/2p5/P2p1p2/P4Pn1/R1P5/3QP1r1/1N2KRq1 w - - 1 33" {
-            return
-        }
         self.generate_knight_moves(&mut moves);
         self.generate_bishop_moves_magics(&mut moves);
         self.generate_rook_moves_magics(&mut moves);
