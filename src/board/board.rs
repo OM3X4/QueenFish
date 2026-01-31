@@ -26,8 +26,8 @@ pub struct Board {
     pub mg_pst_eval: i32,   // Always white favor
     pub eg_pst_eval: i32,   // Always white favor
     pub mobility_eval: i32, // Always white favor
-    pub number_of_pieces: u32,
-    pub number_of_pawns: u32,
+    pub number_of_pieces: usize,
+    pub number_of_pawns: usize,
 }
 
 impl Board {
@@ -296,8 +296,8 @@ impl Board {
         self.eg_pst_eval = eg_score;
 
         self.history = vec![self.hash];
-        self.number_of_pieces = self.generate_pieces_count();
-        self.number_of_pawns = self.generate_pawns_count();
+        self.number_of_pieces = self.generate_pieces_count() as usize;
+        self.number_of_pawns = self.generate_pawns_count() as usize;
     } //
 
     pub fn to_fen(&self) -> String {

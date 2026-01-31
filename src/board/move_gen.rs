@@ -784,6 +784,8 @@ impl Board {
             eg_pst_eval: self.eg_pst_eval,
             mobility_eval: self.mobility_eval,
             last_irreversible_move: self.last_irreversible_move,
+            number_of_pawns: self.number_of_pawns,
+            number_of_pieces: self.number_of_pieces,
         };
 
         /* -----------------------------
@@ -1028,6 +1030,8 @@ impl Board {
         self.occupied = unmake_move.occupied;
         self.history.pop();
         self.last_irreversible_move = unmake_move.last_irreversible_move;
+        self.number_of_pieces = unmake_move.number_of_pieces;
+        self.number_of_pawns = unmake_move.number_of_pawns;
     } //
 } //
 

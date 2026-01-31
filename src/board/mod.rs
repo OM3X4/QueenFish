@@ -299,6 +299,8 @@ pub struct UnMakeMove {
     eg_pst_eval: i32,
     mobility_eval: i32,
     last_irreversible_move: usize,
+    number_of_pieces: usize,
+    number_of_pawns: usize,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
