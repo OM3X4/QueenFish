@@ -18,11 +18,6 @@ lto = "fat"
 codegen-units = 1
 
 [[bin]]
-name = "test_best_move"
-path = "src/bin/test_best_move.rs"
-
-
-[[bin]]
 name = "perft"
 path = "src/bin/perft.rs"
 
@@ -31,6 +26,3 @@ path = "src/bin/perft.rs"
 name = "uci"
 path = "src/bin/uci.rs"
 
-[[bin]]
-name = "open"
-path = "src/bin/openings_generator.rs"
