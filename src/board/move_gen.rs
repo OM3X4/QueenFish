@@ -225,8 +225,6 @@ impl Board {
             let from = pawns.trailing_zeros() as usize;
             pawns &= pawns - 1;
 
-            let pawn_bb = 1u64 << from;
-
             // single and double jump
             if (blockers & (1u64 << (from - 8))) == 0 {
                 if (from - 8) < 8 {
