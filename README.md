@@ -1,3 +1,5 @@
+# QueenFish
+
 **QueenFish** is a chess engine written entirely in Rust. It uses bitboards, magic move generation, and a deterministic alpha–beta search with pruning and caching to achieve high performance while remaining fully reproducible.
 
 ### Motivation
