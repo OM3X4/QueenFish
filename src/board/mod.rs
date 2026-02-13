@@ -183,6 +183,7 @@ impl Move {
     }
 } //
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct UnMakeMove {
     from: usize,
     to: usize,
