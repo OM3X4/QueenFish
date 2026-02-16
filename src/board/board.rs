@@ -644,4 +644,11 @@ impl Board {
             }
         }
     }
+
+    pub fn white_king_sq(&mut self) -> usize {
+        self.bitboards[PieceType::WhiteKing.piece_index()].0.trailing_zeros() as usize
+    }
+    pub fn black_king_sq(&mut self) -> usize {
+        self.bitboards[PieceType::BlackKing.piece_index()].0.trailing_zeros() as usize
+    }
 } //
