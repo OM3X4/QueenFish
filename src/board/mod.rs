@@ -253,3 +253,15 @@ impl DerefMut for BitBoards {
         &mut self.0
     }
 }
+
+pub enum Draw {
+    ThreeFoldRep,
+    Stalemate
+}
+
+pub enum GameResult {
+    Draw(Draw),
+    WhiteWin,
+    BlackWin,
+    InProgress
+}

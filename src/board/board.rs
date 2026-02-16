@@ -1,11 +1,12 @@
 use crate::board::constants::{RANK_1, RANK_2, RANK_7, RANK_8};
 use crate::board::zobrist::{Z_PIECE, Z_SIDE , Z_CASTLING};
-use crate::board::{BitBoard, BitBoards, Turn , Move};
+use crate::board::{BitBoard, BitBoards, Draw, Move, Turn};
 use crate::board::bishop_magic::bishop_attacks;
 use crate::board::constants::KNIGHTS_ATTACK_TABLE;
 use crate::board::openings::OPENING_BOOK;
 use crate::board::rook_magic::rook_attacks;
 use crate::board::pieces::PieceType;
+use crate::board::GameResult;
 use rand::Rng;
 
 
@@ -623,4 +624,24 @@ impl Board {
 
         h
     } //
+
+    pub fn game_result(&mut self) -> GameResult {
+        if self.is_3fold_repetition() {
+            return GameResult::Draw(Draw::ThreeFoldRep);
+        } else {
+            let num_moves = self.generate_moves().len();
+            if num_moves == 0 {
+                if self.is_king_in_check(self.turn) {
+                    match self.turn {
+                        Turn::BLACK => return GameResult::WhiteWin,
+                        Turn::WHITE => return GameResult::BlackWin,
+                    }
+                } else {
+                    return GameResult::Draw(Draw::Stalemate);
+                }
+            } else {
+                return GameResult::InProgress;
+            }
+        }
+    }
 } //
