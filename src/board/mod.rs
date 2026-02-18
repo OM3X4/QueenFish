@@ -254,11 +254,13 @@ impl DerefMut for BitBoards {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Draw {
     ThreeFoldRep,
     Stalemate
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum GameResult {
     Draw(Draw),
     WhiteWin,
