@@ -1,10 +1,10 @@
 pub mod bishop_magic;
 pub mod board;
 pub mod constants;
-mod engine;
+pub mod engine;
 pub mod move_gen;
 mod openings;
-mod pieces;
+pub mod pieces;
 pub mod rook_magic;
 pub mod tt;
 mod zobrist;
