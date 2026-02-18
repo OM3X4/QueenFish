@@ -76,8 +76,12 @@ fn main() {
                 idx += 1;
                 while idx < tokens.len() {
                     let mv = Move::from_uci(tokens[idx], &board);
-                    board.make_move(mv);
-                    idx += 1;
+                    if let Some(mv) = mv {
+                        board.make_move(mv);
+                        idx += 1;
+                    } else {
+                        panic!("Invalid move: {}", tokens[idx]);
+                    }
                 }
             }
             // dbg!(board.hash);

@@ -97,10 +97,12 @@ impl Move {
         s
     } //
     #[inline(always)]
-    pub fn from_uci(uci: &str, board: &Board) -> Move {
+    pub fn from_uci(uci: &str, board: &Board) -> Option<Move> {
         let bytes = uci.as_bytes();
 
-        debug_assert!(bytes.len() >= 4);
+        if bytes.len() < 4 {
+            return None;
+        }
 
         let file_from = (bytes[0] - b'a') as usize;
         let rank_from = (bytes[1] - b'1') as usize;
@@ -117,47 +119,51 @@ impl Move {
                 Turn::WHITE => PieceType::WhitePawn,
             };
 
-            let piece = board.piece_at[from].unwrap();
-
-            if en_passant == to && piece == required_piece {
-                return Move::new(from, to, piece, true, false, None, true);
+            if let Some(piece) = board.piece_at[from] {
+                if en_passant == to && piece == required_piece {
+                    return Some(Move::new(from, to, piece, true, false, None, true));
+                }
+            } else {
+                return None;
             }
         }
 
         let capture = board.piece_at[to as usize].is_some();
-        let piece = board.piece_at[from as usize].unwrap();
-
-        // Handle castling
-        if piece == PieceType::BlackKing || piece == PieceType::WhiteKing {
-            if from.abs_diff(to) == 2 {
-                return Move::new(from, to, piece, false, true, None, false);
+        if let Some(piece) = board.piece_at[from as usize] {
+            // Handle castling
+            if piece == PieceType::BlackKing || piece == PieceType::WhiteKing {
+                if from.abs_diff(to) == 2 {
+                    return Some(Move::new(from, to, piece, false, true, None, false));
+                }
             }
-        }
 
-        if uci.len() == 5
-            && (piece == PieceType::WhitePawn || piece == PieceType::BlackPawn)
-            && (to > 55 || to < 8)
-        {
-            let promotion_char = bytes[4] as char;
-            let promotion_piece = match promotion_char {
-                'q' => PieceType::WhiteQueen,
-                'r' => PieceType::WhiteRook,
-                'b' => PieceType::WhiteBishop,
-                'n' => PieceType::WhiteKnight,
-                _ => panic!("Invalid promotion piece"),
-            };
-            return Move::new(
-                from,
-                to,
-                piece,
-                capture,
-                false,
-                Some(promotion_piece),
-                false,
-            );
-        }
+            if uci.len() == 5
+                && (piece == PieceType::WhitePawn || piece == PieceType::BlackPawn)
+                && (to > 55 || to < 8)
+            {
+                let promotion_char = bytes[4] as char;
+                let promotion_piece = match promotion_char {
+                    'q' => PieceType::WhiteQueen,
+                    'r' => PieceType::WhiteRook,
+                    'b' => PieceType::WhiteBishop,
+                    'n' => PieceType::WhiteKnight,
+                    _ => return None,
+                };
+                return Some(Move::new(
+                    from,
+                    to,
+                    piece,
+                    capture,
+                    false,
+                    Some(promotion_piece),
+                    false,
+                ));
+            }
 
-        Move::new(from, to, piece, capture, false, None, false)
+            Some(Move::new(from, to, piece, capture, false, None, false))
+        } else {
+            return None;
+        }
     } //
 
     #[inline(always)]
@@ -257,7 +263,7 @@ impl DerefMut for BitBoards {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Draw {
     ThreeFoldRep,
-    Stalemate
+    Stalemate,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -265,5 +271,5 @@ pub enum GameResult {
     Draw(Draw),
     WhiteWin,
     BlackWin,
-    InProgress
+    InProgress,
 }
